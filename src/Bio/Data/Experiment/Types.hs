@@ -13,15 +13,11 @@
 module Bio.Data.Experiment.Types where
 
 import           Control.Lens                  (makeLenses, Lens')
-import           Data.HVect
 import           Data.Aeson.TH       (defaultOptions, deriveJSON)
 import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
-import           Data.Map                      (Map)
 import qualified Data.Text                     as T
-import           Data.Type.Bool
 import           GHC.Generics                  (Generic)
-import           GHC.TypeLits
 
 import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Replicate

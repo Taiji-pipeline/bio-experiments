@@ -20,18 +20,20 @@ import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
 import qualified Data.Text           as T
 import           Data.Type.Bool
+import Data.Tagged (Tagged)
 import           GHC.Generics        (Generic)
 import           GHC.TypeLits
 
-data FileType = BamFile
-              | BaiFile
-              | BedFile
-              | FastqFile
-              | BedgraphFile
-              | BigWigFile
-              | NarrowPeakFile
-              | BroadPeakFile
+data FileType = Bam
+              | Bai
+              | Bed
+              | Fastq
+              | Bedgraph
+              | BigWig
+              | NarrowPeak
+              | BroadPeak
               | SRA
+              | Tsv
               | Other
     deriving (Show, Read, Eq, Ord)
 
@@ -60,5 +62,6 @@ type family BioData filelist :: Bool where
     BioData [File f] = 'True
     BioData (HVect '[]) = 'True
     BioData (HVect (f ': fs)) = BioData f && BioData (HVect fs)
-    BioData a = TypeError ( Text "type ‘" :<>:
-        ShowType a :<>: Text "’ is not an instance of 'BioData'.")
+    BioData (Tagged s a) = BioData a
+    BioData a = TypeError ( 'Text "type ‘" ':<>:
+        'ShowType a ':<>: 'Text "’ is not an instance of 'BioData'.")

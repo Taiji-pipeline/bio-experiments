@@ -7,7 +7,6 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 module Bio.Data.Experiment.RNASeq where
 
-import           Control.Lens                  (makeLenses, Lens')
 import           Data.Aeson.TH       (defaultOptions, deriveJSON)
 import           GHC.Generics        (Generic)
 import           Data.Serialize      (Serialize (..))
@@ -15,7 +14,6 @@ import           Data.Serialize.Text ()
 
 import           Bio.Data.Experiment.Types
 import           Bio.Data.Experiment.File
-import           Bio.Data.Experiment.Replicate
 
 data RNASeq file = RNASeq
     { rnaseqCommon    :: CommonFields file
