@@ -20,9 +20,15 @@ import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
 import qualified Data.Text           as T
 import           Data.Type.Bool
-import Data.Tagged (Tagged)
+import Data.Tagged (Tagged, untag)
 import           GHC.Generics        (Generic)
 import           GHC.TypeLits
+
+type MaybeTagged s a = Either a (Tagged s a)
+
+untagMaybe :: MaybeTagged s a -> (a, Bool)
+untagMaybe (Left x) = (x, False)
+untagMaybe (Right x) = (untag x, True)
 
 data FileType = Bam
               | Bai
@@ -41,7 +47,6 @@ data File (filetype :: FileType) where
     File :: { fileLocation :: FilePath
             , fileInfo     :: (Map T.Text T.Text)
             , fileTags     :: [T.Text]
-            , fileGzipped  :: Bool
             } -> File filetype
             deriving (Show, Read, Eq, Ord, Generic)
 
@@ -49,19 +54,13 @@ makeFields ''File
 deriveJSON defaultOptions ''File
 instance Serialize (File filetype)
 
-data FileSet f1 f2 = Single (File f1)
-                   | Paired (File f1) (File f2)
-            deriving (Show, Read, Eq, Ord, Generic)
-
-makePrisms ''FileSet
-deriveJSON defaultOptions ''FileSet
-instance (Serialize (File f1), Serialize (File f2)) => Serialize (FileSet f1 f2)
-
 type family BioData filelist :: Bool where
+    BioData (f1, f2) = BioData f1 && BioData f2
     BioData (File f) = 'True
-    BioData [File f] = 'True
+    BioData (Tagged s f) = BioData f
+    BioData [f] = BioData f
+    BioData (Either f1 f2) = BioData f1 && BioData f2
     BioData (HVect '[]) = 'True
     BioData (HVect (f ': fs)) = BioData f && BioData (HVect fs)
-    BioData (Tagged s a) = BioData a
     BioData a = TypeError ( 'Text "type ‘" ':<>:
         'ShowType a ':<>: 'Text "’ is not an instance of 'BioData'.")

@@ -3,14 +3,17 @@ module Bio.Data.Experiment
     , File
     , location
     , tags
-    , gzipped
     , emptyFile
 
-    , FileSet(..)
-    , _Single
-    , _Paired
+    , MaybeTagged
+    , untagMaybe
+    , GZipped
+    , Pairend
+    , Sorted
+    , MaybePaired
+    , isPaired
 
-    , Replicate
+    , Replicate(..)
     , files
     , info
     , number
@@ -28,12 +31,23 @@ import Bio.Data.Experiment.File
 import Bio.Data.Experiment.Types
 import Bio.Data.Experiment.Replicate
 
+data Sorted
+data Pairend
+data GZipped
+
+type MaybePaired f = Either f (f, f)
+
+isPaired :: MaybePaired f -> Bool
+isPaired (Left _) = False
+isPaired (Right _) = True
+{-# INLINE isPaired #-}
+
 emptyFile :: File filetype
 emptyFile = File
     { fileLocation = ""
     , fileInfo = M.empty
     , fileTags = []
-    , fileGzipped = False }
+    }
 
 {-
 class NGS experiment where

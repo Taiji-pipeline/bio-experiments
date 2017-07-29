@@ -12,7 +12,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Bio.Data.Experiment.Types where
 
-import           Control.Lens                  (makeLenses, Lens')
+import           Control.Lens                  (makeLenses, Lens', Lens)
 import           Data.Aeson.TH       (defaultOptions, deriveJSON)
 import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
@@ -42,19 +42,19 @@ defaultCommonFields = CommonFields
     , _commonReplicates = []
     }
 
-class BioData file ~ 'True => Experiment e file where
-    commonFields :: Lens' (e file) (CommonFields file)
+class BioData file1 ~ 'True => Experiment e file1 where
+    commonFields :: Lens (e file1) (e file2) (CommonFields file1) (CommonFields file2)
 
-    eid :: Lens' (e file) T.Text
+    eid :: Lens' (e file1) T.Text
     eid = commonFields . commonEid
 
-    groupName :: Lens' (e file) (Maybe T.Text)
+    groupName :: Lens' (e file1) (Maybe T.Text)
     groupName = commonFields . commonGroupName
 
-    sampleName :: Lens' (e file) T.Text
+    sampleName :: Lens' (e file1) T.Text
     sampleName = commonFields . commonSampleName
 
-    replicates :: Lens' (e file) [Replicate file]
+    replicates :: Lens (e file1) (e file2) [Replicate file1] [Replicate file2]
     replicates = commonFields . commonReplicates
 
     {-# MINIMAL commonFields #-}
