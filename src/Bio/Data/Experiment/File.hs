@@ -12,7 +12,7 @@
 {-# LANGUAGE UndecidableInstances   #-}
 module Bio.Data.Experiment.File where
 
-import           Control.Lens        (makeFields, makePrisms)
+import           Control.Lens        (makeFields)
 import           Data.Aeson.TH       (defaultOptions, deriveJSON)
 import           Data.HVect          (HVect (..))
 import           Data.Map.Strict     (Map)
@@ -25,6 +25,10 @@ import           GHC.Generics        (Generic)
 import           GHC.TypeLits
 
 type MaybeTagged s a = Either a (Tagged s a)
+
+type family MaybeTags s a where
+    MaybeTags '[] a = a
+    MaybeTags (x ': xs) a = MaybeTagged x (MaybeTags xs a)
 
 untagMaybe :: MaybeTagged s a -> (a, Bool)
 untagMaybe (Left x) = (x, False)
