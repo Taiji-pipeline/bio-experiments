@@ -24,16 +24,6 @@ import Data.Tagged (Tagged, untag)
 import           GHC.Generics        (Generic)
 import           GHC.TypeLits
 
-type MaybeTagged s a = Either a (Tagged s a)
-
-type family MaybeTags s a where
-    MaybeTags '[] a = a
-    MaybeTags (x ': xs) a = MaybeTagged x (MaybeTags xs a)
-
-untagMaybe :: MaybeTagged s a -> (a, Bool)
-untagMaybe (Left x) = (x, False)
-untagMaybe (Right x) = (untag x, True)
-
 data FileType = Bam
               | Bai
               | Bed
@@ -47,20 +37,24 @@ data FileType = Bam
               | Other
     deriving (Show, Read, Eq, Ord)
 
-data File (filetype :: FileType) where
+data FileTag = Sorted
+             | Pairend
+             | GZipped
+
+data File (filetags :: [FileTag]) (filetype :: FileType) where
     File :: { fileLocation :: FilePath
             , fileInfo     :: (Map T.Text T.Text)
             , fileTags     :: [T.Text]
-            } -> File filetype
+            } -> File filetags filetype
             deriving (Show, Read, Eq, Ord, Generic)
 
 makeFields ''File
 deriveJSON defaultOptions ''File
-instance Serialize (File filetype)
+instance Serialize (File filetags filetype)
 
-type family BioData filelist :: Bool where
+type family BioData filetype :: Bool where
     BioData (f1, f2) = BioData f1 && BioData f2
-    BioData (File f) = 'True
+    BioData (File tags f) = 'True
     BioData (Tagged s f) = BioData f
     BioData [f] = BioData f
     BioData (Either f1 f2) = BioData f1 && BioData f2

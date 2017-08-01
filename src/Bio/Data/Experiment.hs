@@ -8,15 +8,13 @@
 {-# LANGUAGE ConstraintKinds #-}
 module Bio.Data.Experiment
     ( FileType(..)
+    , FileTag(..)
     , File
     , location
     , tags
     , emptyFile
 
-    , MaybeTagged
-    , untagMaybe
     , MaybePaired
-    , isPaired
 
     , Replicate(..)
     , files
@@ -27,12 +25,13 @@ module Bio.Data.Experiment
     , ATACSeq
     , RNASeq
 
-    , Tag(..)
     , elemTag
     , MayHave
     , Elem
     , Insert
     , Remove
+    , isGzipped
+    , isPairend
     ) where
 
 import qualified Data.Map.Strict as M
@@ -47,39 +46,37 @@ import Bio.Data.Experiment.File
 import Bio.Data.Experiment.Types
 import Bio.Data.Experiment.Replicate
 
-data Tag = Sorted
-         | Pairend
-         | GZipped
-
 type MayHave tag tags = Typeable (Elem tag tags)
 
-type family Elem (x :: Tag) (xs :: [Tag]) :: Bool where
+type family Elem (x :: FileTag) (xs :: [FileTag]) :: Bool where
     Elem _ '[] = 'False
     Elem a (x ': xs) = a == x || Elem a xs
 
-type family Insert (x :: Tag) (xs :: [Tag]) :: [Tag] where
+type family Insert (x :: FileTag) (xs :: [FileTag]) :: [FileTag] where
     Insert a xs = (a ': xs)
 
-type family Remove (x :: Tag) (xs :: [Tag]) :: [Tag] where
+type family Remove (x :: FileTag) (xs :: [FileTag]) :: [FileTag] where
     Remove _ '[] = '[]
     Remove a (x ': xs) = If (a == x) xs (x ': Remove a xs)
 
-elemTag :: forall a (tag :: Tag) (tags :: [Tag]) . Typeable (Elem tag tags)
+elemTag :: forall a (tag :: FileTag) (tags :: [FileTag]) . Typeable (Elem tag tags)
         => Proxy tag
-        -> Tagged tags a -> Bool
+        -> File tags a -> Bool
 elemTag _ _
     | typeOf (Proxy :: Proxy (Elem tag tags)) ==
       typeOf (Proxy :: Proxy 'True) = True
     | otherwise = False
 
+isGzipped :: MayHave GZipped tags => File tags a -> Bool
+isGzipped = elemTag (Proxy :: Proxy 'GZipped)
+
 type MaybePaired f = Either f (f, f)
 
-isPaired :: MaybePaired f -> Bool
-isPaired (Left _) = False
-isPaired (Right _) = True
-{-# INLINE isPaired #-}
+isPairend :: MayHave Pairend tags => File tags a -> Bool
+isPairend = elemTag (Proxy :: Proxy 'Pairend)
+{-# INLINE isPairend #-}
 
-emptyFile :: File filetype
+emptyFile :: File tags filetype
 emptyFile = File
     { fileLocation = ""
     , fileInfo = M.empty
