@@ -20,7 +20,6 @@ import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
 import qualified Data.Text           as T
 import           Data.Type.Bool
-import Data.Tagged (Tagged, untag)
 import           GHC.Generics        (Generic)
 import           GHC.TypeLits
 
@@ -55,7 +54,6 @@ instance Serialize (File filetags filetype)
 type family BioData filetype :: Bool where
     BioData (f1, f2) = BioData f1 && BioData f2
     BioData (File tags f) = 'True
-    BioData (Tagged s f) = BioData f
     BioData [f] = BioData f
     BioData (Either f1 f2) = BioData f1 && BioData f2
     BioData (HVect '[]) = 'True

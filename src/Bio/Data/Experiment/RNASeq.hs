@@ -13,7 +13,6 @@ import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
 
 import           Bio.Data.Experiment.Types
-import           Bio.Data.Experiment.File
 
 data RNASeq file = RNASeq
     { rnaseqCommon    :: CommonFields file
@@ -23,5 +22,5 @@ data RNASeq file = RNASeq
 deriveJSON defaultOptions ''RNASeq
 instance Serialize file => Serialize (RNASeq file)
 
-instance BioData file ~ 'True => Experiment RNASeq file where
+instance Experiment RNASeq where
     commonFields f e = (\x -> e{rnaseqCommon = x}) <$> f (rnaseqCommon e)

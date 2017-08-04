@@ -42,7 +42,7 @@ defaultCommonFields = CommonFields
     , _commonReplicates = []
     }
 
-class BioData file1 ~ 'True => Experiment e file1 where
+class Experiment e where
     commonFields :: Lens (e file1) (e file2) (CommonFields file1) (CommonFields file2)
 
     eid :: Lens' (e file1) T.Text

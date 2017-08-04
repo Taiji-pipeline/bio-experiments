@@ -37,14 +37,20 @@ module Bio.Data.Experiment
 import qualified Data.Map.Strict as M
 import Data.Typeable
 import Data.Type.Bool
-import Data.Type.Equality
-import Data.Tagged (Tagged(..))
+import Data.Type.Equality (type (==))
 
 import Bio.Data.Experiment.RNASeq
 import Bio.Data.Experiment.ATACSeq
 import Bio.Data.Experiment.File
 import Bio.Data.Experiment.Types
 import Bio.Data.Experiment.Replicate
+
+-- | Define type equality instance
+type family EqTag (a :: FileTag) (b :: FileTag) where
+    EqTag a a = 'True
+    EqTag a b = 'False
+
+type instance a == b = EqTag a b
 
 type MayHave tag tags = Typeable (Elem tag tags)
 
@@ -67,12 +73,12 @@ elemTag _ _
       typeOf (Proxy :: Proxy 'True) = True
     | otherwise = False
 
-isGzipped :: MayHave GZipped tags => File tags a -> Bool
+isGzipped :: MayHave 'GZipped tags => File tags a -> Bool
 isGzipped = elemTag (Proxy :: Proxy 'GZipped)
 
 type MaybePaired f = Either f (f, f)
 
-isPairend :: MayHave Pairend tags => File tags a -> Bool
+isPairend :: MayHave 'Pairend tags => File tags a -> Bool
 isPairend = elemTag (Proxy :: Proxy 'Pairend)
 {-# INLINE isPairend #-}
 

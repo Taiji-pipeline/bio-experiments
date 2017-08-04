@@ -13,7 +13,6 @@ import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
 
 import           Bio.Data.Experiment.Types
-import           Bio.Data.Experiment.File
 
 data ATACSeq file = ATACSeq
     { atacseqCommon    :: CommonFields file
@@ -23,5 +22,5 @@ data ATACSeq file = ATACSeq
 deriveJSON defaultOptions ''ATACSeq
 instance Serialize file => Serialize (ATACSeq file)
 
-instance BioData file ~ 'True => Experiment ATACSeq file where
+instance Experiment ATACSeq where
     commonFields f e = (\x -> e{atacseqCommon = x}) <$> f (atacseqCommon e)
