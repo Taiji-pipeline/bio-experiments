@@ -38,7 +38,7 @@ data FileType = Bam
 
 data FileTag = Sorted
              | Pairend
-             | GZipped
+             | Gzip
 
 data File (filetags :: [FileTag]) (filetype :: FileType) where
     File :: { fileLocation :: FilePath

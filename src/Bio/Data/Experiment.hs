@@ -73,8 +73,8 @@ elemTag _ _
       typeOf (Proxy :: Proxy 'True) = True
     | otherwise = False
 
-isGzipped :: MayHave 'GZipped tags => File tags a -> Bool
-isGzipped = elemTag (Proxy :: Proxy 'GZipped)
+isGzipped :: MayHave 'Gzip tags => File tags a -> Bool
+isGzipped = elemTag (Proxy :: Proxy 'Gzip)
 
 type MaybePaired f = Either f (f, f)
 
