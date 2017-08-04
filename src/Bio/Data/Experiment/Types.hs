@@ -1,10 +1,8 @@
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE GADTs                #-}
-{-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE PolyKinds            #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
@@ -19,7 +17,6 @@ import           Data.Serialize.Text ()
 import qualified Data.Text                     as T
 import           GHC.Generics                  (Generic)
 
-import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Replicate
 
 -- | A set of fields that exist in all kinds of Assays

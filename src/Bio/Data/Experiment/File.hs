@@ -3,9 +3,7 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE KindSignatures         #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
@@ -22,6 +20,9 @@ import qualified Data.Text           as T
 import           Data.Type.Bool
 import           GHC.Generics        (Generic)
 import           GHC.TypeLits
+import Data.Promotion.Prelude.Eq (PEq(..))
+import Data.Type.Equality (type (==))
+
 
 data FileType = Bam
               | Bai
@@ -39,6 +40,17 @@ data FileType = Bam
 data FileTag = Sorted
              | Pairend
              | Gzip
+
+-- | Define type equality instance
+type family EqTag (a :: FileTag) (b :: FileTag) where
+    EqTag a a = 'True
+    EqTag a b = 'False
+
+type instance a == b = EqTag a b
+
+instance PEq FileTag where
+    type a :== b = EqTag a b
+    type a :/= b = Not (EqTag a b)
 
 data File (filetags :: [FileTag]) (filetype :: FileType) where
     File :: { fileLocation :: FilePath

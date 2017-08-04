@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -27,17 +28,13 @@ module Bio.Data.Experiment
 
     , elemTag
     , MayHave
-    , Elem
-    , Insert
-    , Remove
     , isGzipped
     , isPairend
     ) where
 
 import qualified Data.Map.Strict as M
-import Data.Typeable
-import Data.Type.Bool
-import Data.Type.Equality (type (==))
+import Data.Typeable (Typeable, Proxy(..), typeOf)
+import Data.Promotion.Prelude.List (Elem)
 
 import Bio.Data.Experiment.RNASeq
 import Bio.Data.Experiment.ATACSeq
@@ -45,25 +42,7 @@ import Bio.Data.Experiment.File
 import Bio.Data.Experiment.Types
 import Bio.Data.Experiment.Replicate
 
--- | Define type equality instance
-type family EqTag (a :: FileTag) (b :: FileTag) where
-    EqTag a a = 'True
-    EqTag a b = 'False
-
-type instance a == b = EqTag a b
-
 type MayHave tag tags = Typeable (Elem tag tags)
-
-type family Elem (x :: FileTag) (xs :: [FileTag]) :: Bool where
-    Elem _ '[] = 'False
-    Elem a (x ': xs) = a == x || Elem a xs
-
-type family Insert (x :: FileTag) (xs :: [FileTag]) :: [FileTag] where
-    Insert a xs = (a ': xs)
-
-type family Remove (x :: FileTag) (xs :: [FileTag]) :: [FileTag] where
-    Remove _ '[] = '[]
-    Remove a (x ': xs) = If (a == x) xs (x ': Remove a xs)
 
 elemTag :: forall a (tag :: FileTag) (tags :: [FileTag]) . Typeable (Elem tag tags)
         => Proxy tag
