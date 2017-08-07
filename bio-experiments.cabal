@@ -22,14 +22,18 @@ library
                        Bio.Data.Experiment.Replicate
                        Bio.Data.Experiment.RNASeq
                        Bio.Data.Experiment.ATACSeq
+                       Bio.Data.Experiment.Parser
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , cereal
                      , cereal-text
+                     , case-insensitive
                      , containers
                      , lens
                      , text
                      , singletons
+                     , unordered-containers
+                     , yaml
                      , vector
   default-language:    Haskell2010
 

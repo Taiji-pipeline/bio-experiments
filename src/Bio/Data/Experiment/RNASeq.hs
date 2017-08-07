@@ -17,7 +17,7 @@ import           Bio.Data.Experiment.Types
 data RNASeq file = RNASeq
     { rnaseqCommon    :: CommonFields file
     , rnaseqPairedEnd :: !Bool
-    } deriving (Ord, Eq, Generic)
+    } deriving (Generic)
 
 deriveJSON defaultOptions ''RNASeq
 instance Serialize file => Serialize (RNASeq file)

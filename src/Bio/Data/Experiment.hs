@@ -13,6 +13,8 @@ module Bio.Data.Experiment
     ( FileType(..)
     , FileTag(..)
     , File
+    , SomeFile(..)
+    , SomeTags(..)
     , FileList(..)
     , location
     , tags

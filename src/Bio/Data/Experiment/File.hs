@@ -10,6 +10,7 @@
 {-# LANGUAGE UndecidableInstances   #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Bio.Data.Experiment.File where
 
@@ -27,18 +28,22 @@ import           GHC.TypeLits
 import Data.Promotion.Prelude.Eq (PEq(..))
 import Data.Singletons.TH
 
-data FileType = Bam
-              | Bai
-              | Bed
-              | Fastq
-              | Bedgraph
-              | BigWig
-              | NarrowPeak
-              | BroadPeak
-              | SRA
-              | Tsv
-              | Other
-    deriving (Show, Read, Eq)
+$(singletons [d|
+    data FileType = Bam
+                  | Bai
+                  | Bed
+                  | Fastq
+                  | Bedgraph
+                  | BigWig
+                  | NarrowPeak
+                  | BroadPeak
+                  | SRA
+                  | Tsv
+                  | Other
+        deriving (Show, Read, Eq)
+    |])
+
+deriveJSON defaultOptions ''FileType
 
 $(singletons [d|
     data FileTag = Sorted
@@ -47,25 +52,36 @@ $(singletons [d|
         deriving (Show, Read, Eq)
     |])
 
+deriveJSON defaultOptions ''FileTag
+
 data File (filetags :: [FileTag]) (filetype :: FileType) where
     File :: { fileLocation :: FilePath
             , fileInfo     :: (Map T.Text T.Text)
             , fileTags     :: [T.Text]
             } -> File filetags filetype
-            deriving (Show, Read, Eq, Ord, Generic)
+            deriving (Show, Read, Generic)
 
 makeFields ''File
 deriveJSON defaultOptions ''File
 instance Serialize (File filetags filetype)
+
+getFileType :: forall tags (filetype :: FileType) . SingI filetype
+            => File tags filetype -> FileType
+getFileType _ = fromSing (sing :: Sing filetype)
+
+data SomeFile where
+    SomeFile :: (SingI filetype, SingI filetags)
+             => File filetags filetype -> SomeFile
+
+data SomeTags filetype where
+    SomeTags :: SingI filetags
+             => File filetags filetype -> SomeTags filetype
 
 data FileList :: [[FileTag]] -> [FileType] -> * where
     FNil :: FileList '[] '[]
     FCons :: File tag filetype
           -> FileList tags filetypes
           -> FileList (tag ': tags) (filetype ': filetypes)
-
-deriving instance Eq (FileList tags filetypes)
-deriving instance Ord (FileList tags filetypes)
 
 instance Serialize (FileList '[] '[]) where
     put _ = put (0 :: Int)
@@ -83,7 +99,7 @@ instance Serialize (FileList tags filetypes) =>
 instance ToJSON (FileList tags filetypes) where
     toJSON fs = Array $ V.fromList $ go fs
         where
-          go :: FileList tags filetypes -> [Value]
+          go :: FileList tags' filetypes' -> [Value]
           go FNil = []
           go (FCons x xs) = toJSON x : go xs
 

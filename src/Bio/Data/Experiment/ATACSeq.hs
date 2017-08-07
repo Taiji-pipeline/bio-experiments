@@ -17,7 +17,7 @@ import           Bio.Data.Experiment.Types
 data ATACSeq file = ATACSeq
     { atacseqCommon    :: CommonFields file
     , atacseqPairedEnd :: !Bool
-    } deriving (Eq, Ord, Generic)
+    } deriving (Generic)
 
 deriveJSON defaultOptions ''ATACSeq
 instance Serialize file => Serialize (ATACSeq file)

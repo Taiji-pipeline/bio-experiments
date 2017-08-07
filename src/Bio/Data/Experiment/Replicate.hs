@@ -21,7 +21,7 @@ data Replicate file = Replicate
     , _replicateInfo   :: (Map T.Text T.Text)
     , _replicateNumber :: Int
     }
-    deriving (Ord, Eq, Generic)
+    deriving (Generic)
 
 makeFields ''Replicate
 

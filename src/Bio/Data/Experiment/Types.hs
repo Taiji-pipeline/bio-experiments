@@ -25,7 +25,7 @@ data CommonFields file = CommonFields
     , _commonGroupName  :: !(Maybe T.Text)
     , _commonSampleName :: !T.Text
     , _commonReplicates :: [Replicate file]
-    } deriving (Ord, Eq, Generic)
+    } deriving (Generic)
 
 makeLenses ''CommonFields
 deriveJSON defaultOptions ''CommonFields
