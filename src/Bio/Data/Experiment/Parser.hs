@@ -69,6 +69,18 @@ parseFile = withObject "File" $ \obj' -> do
         SomeFile fl' -> case toSing ft of
             SomeSing ft' -> withSingI ft' $ SomeFile $ setFiletype ft' fl'
 
+parseFilePair :: Value -> Parser (MaybePair SomeFile)
+parseFilePair = withObject "FileSet" $ \obj' -> do
+    let obj = toLowerKey obj'
+    fls <- obj .:? "pair"
+    case fls of
+        Nothing -> Left <$> parseFile (Object obj')
+        Just array -> flip (withArray "FileSet") array $ \xs ->
+            if V.length xs == 2
+                then fmap Right $ (,) <$> parseFile (xs `V.unsafeIndex` 0)
+                         <*> parseFile (xs `V.unsafeIndex` 1)
+                else error "The number of files must be 2."
+
 guessFormat :: FilePath -> FileType
 guessFormat fl = case () of
     _ | ".bam" `T.isSuffixOf` fl' -> Bam
@@ -85,14 +97,14 @@ guessFormat fl = case () of
 gzipped :: FilePath -> Bool
 gzipped fl = ".gz" `T.isSuffixOf` T.pack fl
 
-parseReplicate :: Value -> Parser (Replicate [SomeFile])
+parseReplicate :: Value -> Parser (Replicate [MaybePair SomeFile])
 parseReplicate = withObject "Replicate" $ \obj' -> do
     let obj = toLowerKey obj'
-    Replicate <$> withParser (parseList parseFile) obj "files" <*>
+    Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
                   obj .:? "info" .!= M.empty <*>
                   obj .:? "rep" .!= 0
 
-parseCommonFields :: Value -> Parser (CommonFields [SomeFile])
+parseCommonFields :: Value -> Parser (CommonFields [MaybePair SomeFile])
 parseCommonFields = withObject "CommonFields" $ \obj' -> do
     let obj = toLowerKey obj'
     CommonFields <$> obj .: "id" <*>
@@ -110,7 +122,7 @@ parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
                 obj .:? "control"
                 -}
 
-readATACSeq :: FilePath -> T.Text -> IO [ATACSeq [SomeFile]]
+readATACSeq :: FilePath -> T.Text -> IO [ATACSeq [MaybePair SomeFile]]
 readATACSeq input key = do
     dat <- readYml input
     return $ fromMaybe [] $ HM.lookup (mk key) dat >>= parseMaybe (parseList parseATACSeq)
@@ -122,13 +134,13 @@ readATACSeq input key = do
             Nothing  -> error "Unable to read input file. Formatting error!"
             Just dat -> return $ HM.fromList $ map (first mk) $ HM.toList dat
 
-parseATACSeq :: Value -> Parser (ATACSeq [SomeFile])
+parseATACSeq :: Value -> Parser (ATACSeq [MaybePair SomeFile])
 parseATACSeq = withObject "ATACSeq" $ \obj' -> do
     let obj = toLowerKey obj'
     ATACSeq <$> parseCommonFields (Object obj') <*>
                 obj .:? "pairedend" .!= False
 
-parseRNASeq :: Value -> Parser (RNASeq [SomeFile])
+parseRNASeq :: Value -> Parser (RNASeq [MaybePair SomeFile])
 parseRNASeq = withObject "RNASeq" $ \obj' -> do
     let obj = toLowerKey obj'
     RNASeq <$> parseCommonFields (Object obj') <*>

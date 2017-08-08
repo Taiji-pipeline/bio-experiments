@@ -1,32 +1,37 @@
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Bio.Data.Experiment.File where
 
-import           Control.Lens        (makeFields)
-import           Data.Aeson (ToJSON(..), Value(..), FromJSON(..), withArray)
-import           Data.Aeson.TH       (defaultOptions, deriveJSON)
-import           Data.Map.Strict     (Map)
-import           Data.Serialize      (Serialize (..))
-import           Data.Serialize.Text ()
-import qualified Data.Text           as T
+import           Control.Lens              (makeFields)
+import           Data.Aeson                (FromJSON (..), ToJSON (..),
+                                            Value (..), withArray, (.=), object, withObject, (.:))
+import           Data.Aeson.TH             (defaultOptions, deriveJSON)
+import qualified Data.Map.Strict           as M
+import           Data.Promotion.Prelude
+import           Data.Singletons.Prelude
+import           Data.Serialize            (Serialize (..))
+import           Data.Serialize.Text       ()
+import           Data.Singletons.TH
+import qualified Data.Text                 as T
 import           Data.Type.Bool
-import           GHC.Generics        (Generic)
-import qualified Data.Vector as V
+import qualified Data.Vector               as V
+import           GHC.Generics              (Generic)
 import           GHC.TypeLits
-import Data.Promotion.Prelude.Eq (PEq(..))
-import Data.Singletons.TH
 
 $(singletons [d|
     data FileType = Bam
@@ -40,23 +45,25 @@ $(singletons [d|
                   | SRA
                   | Tsv
                   | Other
-        deriving (Show, Read, Eq)
+        deriving (Show, Read, Eq, Ord, Generic)
     |])
 
 deriveJSON defaultOptions ''FileType
+instance Serialize FileType
 
 $(singletons [d|
     data FileTag = Sorted
                  | Pairend
                  | Gzip
-        deriving (Show, Read, Eq)
+        deriving (Show, Read, Eq, Ord, Generic)
     |])
 
 deriveJSON defaultOptions ''FileTag
+instance Serialize FileTag
 
 data File (filetags :: [FileTag]) (filetype :: FileType) where
     File :: { fileLocation :: FilePath
-            , fileInfo     :: (Map T.Text T.Text)
+            , fileInfo     :: (M.Map T.Text T.Text)
             , fileTags     :: [T.Text]
             } -> File filetags filetype
             deriving (Show, Read, Generic)
@@ -73,9 +80,41 @@ data SomeFile where
     SomeFile :: (SingI filetype, SingI filetags)
              => File filetags filetype -> SomeFile
 
+instance Serialize SomeFile where
+    put fl = case fl of
+        SomeFile (fl' :: File filetag filetype) -> do
+            put $ fromSing (sing :: Sing filetag)
+            put $ fromSing (sing :: Sing filetype)
+            put fl'
+    get = do
+        filetags <- get :: _ [FileTag]
+        filetype <- get :: _ FileType
+        case toSing filetags of
+            SomeSing (tag :: Sing tags) -> case toSing filetype of
+                SomeSing (ft :: SFileType ft) -> withSingI tag $ withSingI ft $
+                    SomeFile <$> (get :: _ (File tags 'Bed))
+
+instance ToJSON SomeFile where
+    toJSON fl = case fl of
+        SomeFile (fl' :: File filetag filetype) -> object
+            [ "filetag" .= fromSing (sing :: Sing filetag)
+            , "filetype" .= fromSing (sing :: Sing filetype)
+            , "data" .= fl' ]
+
+instance FromJSON SomeFile where
+    parseJSON = withObject "SomeFile" $ \obj -> do
+        filetags <- obj .: "filetag" :: _ [FileTag]
+        filetype <- obj .: "filetype" :: _ FileType
+        case toSing filetags of
+            SomeSing (tag :: Sing tags) -> case toSing filetype of
+                SomeSing (ft :: SFileType ft) -> withSingI tag $ withSingI ft $
+                    SomeFile <$> (obj .: "data" :: _ (File tags 'Bed))
+
 data SomeTags filetype where
     SomeTags :: SingI filetags
              => File filetags filetype -> SomeTags filetype
+
+type MaybePair a = Either a (a,a)
 
 data FileList :: [[FileTag]] -> [FileType] -> * where
     FNil :: FileList '[] '[]
@@ -100,7 +139,7 @@ instance ToJSON (FileList tags filetypes) where
     toJSON fs = Array $ V.fromList $ go fs
         where
           go :: FileList tags' filetypes' -> [Value]
-          go FNil = []
+          go FNil         = []
           go (FCons x xs) = toJSON x : go xs
 
 instance FromJSON (FileList '[] '[]) where

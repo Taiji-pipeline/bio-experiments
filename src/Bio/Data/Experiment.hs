@@ -20,7 +20,7 @@ module Bio.Data.Experiment
     , tags
     , emptyFile
 
-    , MaybePaired
+    , MaybePair
 
     , Replicate(..)
     , files
@@ -31,16 +31,13 @@ module Bio.Data.Experiment
     , ATACSeq
     , RNASeq
 
-    , elemTag
-    , MayHave
-    , isGzipped
-    , isPairend
-
     , IsGzip
     , IsGzipSym0
     , hasTag
 
     , AllC
+    , splitExpByFile
+    , getFileType
     ) where
 
 import qualified Data.Map.Strict as M
@@ -50,6 +47,7 @@ import GHC.Exts (Constraint)
 import Data.Promotion.TH
 import Data.Singletons.Prelude.List hiding (Replicate)
 import Data.Singletons
+import Control.Lens
 
 import Bio.Data.Experiment.RNASeq
 import Bio.Data.Experiment.ATACSeq
@@ -57,30 +55,9 @@ import Bio.Data.Experiment.File
 import Bio.Data.Experiment.Types
 import Bio.Data.Experiment.Replicate
 
-
-
-type MayHave tag tags = Typeable (Elem tag tags)
-
-elemTag :: forall a (tag :: FileTag) (tags :: [FileTag]) . Typeable (Elem tag tags)
-        => Proxy tag
-        -> File tags a -> Bool
-elemTag _ _
-    | typeOf (Proxy :: Proxy (Elem tag tags)) ==
-      typeOf (Proxy :: Proxy 'True) = True
-    | otherwise = False
-
 hasTag :: forall tags filetype . SingI tags
        => File tags filetype -> FileTag -> Bool
 hasTag _ t = t `elem` fromSing (sing :: SList tags)
-
-isGzipped :: MayHave 'Gzip tags => File tags a -> Bool
-isGzipped = elemTag (Proxy :: Proxy 'Gzip)
-
-type MaybePaired f = Either f (f, f)
-
-isPairend :: MayHave 'Pairend tags => File tags a -> Bool
-isPairend = elemTag (Proxy :: Proxy 'Pairend)
-{-# INLINE isPairend #-}
 
 emptyFile :: File tags filetype
 emptyFile = File
@@ -99,7 +76,11 @@ type family AllC (c :: k -> Constraint) (xs :: [k]) :: Constraint where
     AllC c '[] = ()
     AllC c (x ': xs) = (c x, AllC c xs)
 
-{-
-class NGS experiment where
-    pair
-    -}
+-- | Split a single experiment into multiple experiments, each containing a
+-- fileset.
+splitExpByFile :: Experiment e => e [f] -> [e f]
+splitExpByFile e = zipWith (\x y -> replicates .~ [x] $ y)
+    (concatMap f $ e^.replicates) $ repeat e
+  where
+    f r = zipWith (\x y -> files .~ x $ y) (r^.files) $ repeat r
+{-# INLINE splitExpByFile #-}

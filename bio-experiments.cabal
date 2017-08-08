@@ -49,6 +49,7 @@ test-suite tests
                      , cereal
                      , tasty
                      , tasty-hunit
+                     , singletons
                      , bio-experiments
 
 source-repository head
