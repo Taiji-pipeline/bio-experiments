@@ -33,6 +33,7 @@ import qualified Data.Vector               as V
 import           GHC.Generics              (Generic)
 import           GHC.TypeLits
 
+-- | Formats of files
 $(singletons [d|
     data FileType = Bam
                   | Bai
@@ -51,6 +52,8 @@ $(singletons [d|
 deriveJSON defaultOptions ''FileType
 instance Serialize FileType
 
+
+-- | Tags of files
 $(singletons [d|
     data FileTag = Sorted
                  | Pairend
@@ -61,10 +64,12 @@ $(singletons [d|
 deriveJSON defaultOptions ''FileTag
 instance Serialize FileTag
 
+
+-- | File
 data File (filetags :: [FileTag]) (filetype :: FileType) where
     File :: { fileLocation :: FilePath
             , fileInfo     :: (M.Map T.Text T.Text)
-            , fileTags     :: [T.Text]
+            , fileTags     :: [FileTag]
             } -> File filetags filetype
             deriving (Show, Read, Generic)
 
@@ -76,6 +81,8 @@ getFileType :: forall tags (filetype :: FileType) . SingI filetype
             => File tags filetype -> FileType
 getFileType _ = fromSing (sing :: Sing filetype)
 
+
+-- | Opaque File
 data SomeFile where
     SomeFile :: (SingI filetype, SingI filetags)
              => File filetags filetype -> SomeFile
@@ -114,7 +121,9 @@ data SomeTags filetype where
     SomeTags :: SingI filetags
              => File filetags filetype -> SomeTags filetype
 
-type MaybePair a = Either a (a,a)
+type FilePair tags filetype = (File tags filetype, File tags filetype)
+type MaybePair tags1 tags2 filetype = Either (File tags1 filetype) (FilePair tags2 filetype)
+type EitherTag tags1 tags2 filetype = Either (File tags1 filetype) (File tags2 filetype)
 
 data FileList :: [[FileTag]] -> [FileType] -> * where
     FNil :: FileList '[] '[]

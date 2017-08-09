@@ -29,6 +29,7 @@ import           Control.Arrow                 (first)
 import           Data.Aeson
 import           Data.Aeson.Internal           (JSONPathElement (..), (<?>))
 import           Data.Aeson.Types
+import           Data.CaseInsensitive          (CI, mk)
 import           Data.Coerce                   (coerce)
 import qualified Data.HashMap.Strict           as HM
 import           Data.List                     (foldl', nub)
@@ -37,14 +38,15 @@ import           Data.Maybe                    (fromMaybe)
 import           Data.Singletons
 import qualified Data.Text                     as T
 import qualified Data.Vector                   as V
-import Data.Yaml
-import Data.CaseInsensitive (CI, mk)
+import           Data.Yaml
 
+import           Bio.Data.Experiment.ATACSeq
 import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Replicate
-import           Bio.Data.Experiment.Types
-import           Bio.Data.Experiment.ATACSeq
 import           Bio.Data.Experiment.RNASeq
+import           Bio.Data.Experiment.Types
+
+type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
 
 addTag :: SFileTag tag -> File tags ft -> File (tag ': tags) ft
 addTag _ fl = coerce fl
@@ -69,7 +71,7 @@ parseFile = withObject "File" $ \obj' -> do
         SomeFile fl' -> case toSing ft of
             SomeSing ft' -> withSingI ft' $ SomeFile $ setFiletype ft' fl'
 
-parseFilePair :: Value -> Parser (MaybePair SomeFile)
+parseFilePair :: Value -> Parser MaybePairSomeFile
 parseFilePair = withObject "FileSet" $ \obj' -> do
     let obj = toLowerKey obj'
     fls <- obj .:? "pair"
@@ -97,14 +99,16 @@ guessFormat fl = case () of
 gzipped :: FilePath -> Bool
 gzipped fl = ".gz" `T.isSuffixOf` T.pack fl
 
-parseReplicate :: Value -> Parser (Replicate [MaybePair SomeFile])
+parseReplicate :: Value
+               -> Parser (Replicate [MaybePairSomeFile])
 parseReplicate = withObject "Replicate" $ \obj' -> do
     let obj = toLowerKey obj'
     Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
                   obj .:? "info" .!= M.empty <*>
                   obj .:? "rep" .!= 0
 
-parseCommonFields :: Value -> Parser (CommonFields [MaybePair SomeFile])
+parseCommonFields :: Value
+                  -> Parser (CommonFields [MaybePairSomeFile])
 parseCommonFields = withObject "CommonFields" $ \obj' -> do
     let obj = toLowerKey obj'
     CommonFields <$> obj .: "id" <*>
@@ -122,7 +126,8 @@ parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
                 obj .:? "control"
                 -}
 
-readATACSeq :: FilePath -> T.Text -> IO [ATACSeq [MaybePair SomeFile]]
+readATACSeq :: FilePath -> T.Text
+            -> IO [ATACSeq [MaybePairSomeFile]]
 readATACSeq input key = do
     dat <- readYml input
     return $ fromMaybe [] $ HM.lookup (mk key) dat >>= parseMaybe (parseList parseATACSeq)
@@ -134,13 +139,13 @@ readATACSeq input key = do
             Nothing  -> error "Unable to read input file. Formatting error!"
             Just dat -> return $ HM.fromList $ map (first mk) $ HM.toList dat
 
-parseATACSeq :: Value -> Parser (ATACSeq [MaybePair SomeFile])
+parseATACSeq :: Value -> Parser (ATACSeq [MaybePairSomeFile])
 parseATACSeq = withObject "ATACSeq" $ \obj' -> do
     let obj = toLowerKey obj'
     ATACSeq <$> parseCommonFields (Object obj') <*>
                 obj .:? "pairedend" .!= False
 
-parseRNASeq :: Value -> Parser (RNASeq [MaybePair SomeFile])
+parseRNASeq :: Value -> Parser (RNASeq [MaybePairSomeFile])
 parseRNASeq = withObject "RNASeq" $ \obj' -> do
     let obj = toLowerKey obj'
     RNASeq <$> parseCommonFields (Object obj') <*>

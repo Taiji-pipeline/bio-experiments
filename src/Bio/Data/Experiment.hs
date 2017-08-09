@@ -13,14 +13,15 @@ module Bio.Data.Experiment
     ( FileType(..)
     , FileTag(..)
     , File
+    , FilePair
+    , MaybePair
+    , EitherTag
     , SomeFile(..)
     , SomeTags(..)
     , FileList(..)
     , location
     , tags
     , emptyFile
-
-    , MaybePair
 
     , Replicate(..)
     , files
@@ -31,8 +32,6 @@ module Bio.Data.Experiment
     , ATACSeq
     , RNASeq
 
-    , IsGzip
-    , IsGzipSym0
     , hasTag
 
     , AllC
@@ -41,8 +40,6 @@ module Bio.Data.Experiment
     ) where
 
 import qualified Data.Map.Strict as M
-import Data.Typeable (Typeable, Proxy(..), typeOf)
-import Data.Promotion.Prelude.List (Elem)
 import GHC.Exts (Constraint)
 import Data.Promotion.TH
 import Data.Singletons.Prelude.List hiding (Replicate)
@@ -65,12 +62,6 @@ emptyFile = File
     , fileInfo = M.empty
     , fileTags = []
     }
-
-$(promote [d|
-    isGzip :: FileTag -> Bool
-    isGzip Gzip = True
-    isGzip _ = False
-    |])
 
 type family AllC (c :: k -> Constraint) (xs :: [k]) :: Constraint where
     AllC c '[] = ()
