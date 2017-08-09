@@ -18,6 +18,7 @@ import qualified Data.Text                     as T
 import           GHC.Generics                  (Generic)
 
 import           Bio.Data.Experiment.Replicate
+import           Bio.Data.Experiment.File
 
 -- | A set of fields that exist in all kinds of Assays
 data CommonFields file = CommonFields
@@ -55,3 +56,6 @@ class Experiment e where
     replicates = commonFields . commonReplicates
 
     {-# MINIMAL commonFields #-}
+
+type MaybePairExp e tags1 tags2 filetype = Either (e (File tags1 filetype))
+    (e (File tags2 filetype, File tags2 filetype))

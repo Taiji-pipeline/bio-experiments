@@ -1,13 +1,14 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeInType           #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeInType #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Bio.Data.Experiment
     ( FileType(..)
@@ -28,6 +29,7 @@ module Bio.Data.Experiment
     , info
     , number
     , Experiment(..)
+    , MaybePairExp
 
     , ATACSeq
     , RNASeq
@@ -36,21 +38,28 @@ module Bio.Data.Experiment
 
     , AllC
     , splitExpByFile
+    , splitExpByFileEither
     , getFileType
+    , mergeExps
     ) where
 
-import qualified Data.Map.Strict as M
-import GHC.Exts (Constraint)
-import Data.Promotion.TH
-import Data.Singletons.Prelude.List hiding (Replicate)
-import Data.Singletons
-import Control.Lens
+import           Control.Lens
+import           Data.Bifunctor                (bimap)
+import           Data.Either                   (partitionEithers)
+import           Data.Function                 (on)
+import           Data.List                     (groupBy, sortBy)
+import qualified Data.Map.Strict               as M
+import           Data.Monoid                   ((<>))
+import           Data.Ord                      (comparing)
+import           Data.Singletons
+import           Data.Singletons.Prelude.List  hiding (Replicate)
+import           GHC.Exts                      (Constraint)
 
-import Bio.Data.Experiment.RNASeq
-import Bio.Data.Experiment.ATACSeq
-import Bio.Data.Experiment.File
-import Bio.Data.Experiment.Types
-import Bio.Data.Experiment.Replicate
+import           Bio.Data.Experiment.ATACSeq
+import           Bio.Data.Experiment.File
+import           Bio.Data.Experiment.Replicate
+import           Bio.Data.Experiment.RNASeq
+import           Bio.Data.Experiment.Types
 
 hasTag :: forall tags filetype . SingI tags
        => File tags filetype -> FileTag -> Bool
@@ -75,3 +84,41 @@ splitExpByFile e = zipWith (\x y -> replicates .~ [x] $ y)
   where
     f r = zipWith (\x y -> files .~ x $ y) (r^.files) $ repeat r
 {-# INLINE splitExpByFile #-}
+
+splitExpByFileEither :: Experiment e
+                     => e [Either f1 f2]
+                     -> Maybe [Either (e f1) (e f2)]
+splitExpByFileEither e = if not (null lf) && not (null rt)
+    then Nothing
+    else Just $ map (bimap (\x -> replicates .~ [x] $ e)
+        (\x -> replicates .~ [x] $ e)) reps
+  where
+    (lf, rt) = partitionEithers reps
+    reps = concatMap f $ e^.replicates
+    f :: Replicate [Either f1 f2] -> [Either (Replicate f1) (Replicate f2)]
+    f r = map (bimap (\x -> files .~ x $ r) (\x -> files .~ x $ r)) $ r^.files
+{-# INLINE splitExpByFileEither #-}
+
+-- | Merge experiments with same id.
+mergeExps :: Experiment e => [e f] -> [e [f]]
+mergeExps es = map combineExp expGroup
+  where
+    expGroup = groupBy ((==) `on` (^.eid)) $ sortBy (comparing (^.eid)) es
+    combineExp e = if allEqual (map (\x -> (x^.groupName, x^.sampleName)) e)
+        then replicates .~ mergeReps (concatMap (^.replicates) e) $ head e
+        else error "Abort: Found experiments with same id but with different contents"
+    allEqual (x:xs) = all (==x) xs
+    allEqual _      = True
+{-# INLINE mergeExps #-}
+
+-- | Merge replicates with same number.
+mergeReps :: [Replicate f] -> [Replicate [f]]
+mergeReps rs = map combineRep repGroup
+  where
+    repGroup = groupBy ((==) `on` (^.number)) $ sortBy (comparing (^.number)) rs
+    combineRep reps = files .~ map (^.files) reps $ info .~ infos $ head reps
+      where
+        infos = M.fromListWith f $ concatMap (M.toList . (^.info)) reps
+        f a b | a == b = a
+              | otherwise = a <> " | " <> b
+{-# INLINE mergeReps #-}
