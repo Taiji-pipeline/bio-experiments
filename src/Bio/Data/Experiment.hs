@@ -40,6 +40,8 @@ module Bio.Data.Experiment
     , splitExpByFile
     , splitExpByFileEither
     , getFileType
+    , someFileIs
+    , fromSomeFile
     , mergeExps
     ) where
 

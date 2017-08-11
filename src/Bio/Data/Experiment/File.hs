@@ -32,6 +32,7 @@ import           Data.Type.Bool
 import qualified Data.Vector               as V
 import           GHC.Generics              (Generic)
 import           GHC.TypeLits
+import           Data.Coerce                   (coerce)
 
 -- | Formats of files
 $(singletons [d|
@@ -99,7 +100,7 @@ instance Serialize SomeFile where
         case toSing filetags of
             SomeSing (tag :: Sing tags) -> case toSing filetype of
                 SomeSing (ft :: SFileType ft) -> withSingI tag $ withSingI ft $
-                    SomeFile <$> (get :: _ (File tags 'Bed))
+                    SomeFile <$> (get :: _ (File tags ft))
 
 instance ToJSON SomeFile where
     toJSON fl = case fl of
@@ -115,7 +116,15 @@ instance FromJSON SomeFile where
         case toSing filetags of
             SomeSing (tag :: Sing tags) -> case toSing filetype of
                 SomeSing (ft :: SFileType ft) -> withSingI tag $ withSingI ft $
-                    SomeFile <$> (obj .: "data" :: _ (File tags 'Bed))
+                    SomeFile <$> (obj .: "data" :: _ (File tags ft))
+
+someFileIs :: SomeFile -> FileType -> Bool
+someFileIs fl ft = case fl of
+    SomeFile fl' -> getFileType fl' == ft
+
+fromSomeFile :: SomeFile -> File tag filetype
+fromSomeFile x = case x of
+    SomeFile fl -> coerce fl
 
 data SomeTags filetype where
     SomeTags :: SingI filetags
