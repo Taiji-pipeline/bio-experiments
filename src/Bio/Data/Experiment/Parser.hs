@@ -23,6 +23,7 @@
 module Bio.Data.Experiment.Parser
     ( readATACSeq
     , parseRNASeq
+    , guessFormat
     ) where
 
 import           Control.Arrow                 (first)
