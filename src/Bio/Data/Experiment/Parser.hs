@@ -22,6 +22,7 @@
 
 module Bio.Data.Experiment.Parser
     ( readATACSeq
+    , readRNASeq
     , parseRNASeq
     , guessFormat
     ) where
@@ -129,16 +130,11 @@ parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
 
 readATACSeq :: FilePath -> T.Text
             -> IO [ATACSeq [MaybePairSomeFile]]
-readATACSeq input key = do
-    dat <- readYml input
-    return $ fromMaybe [] $ HM.lookup (mk key) dat >>= parseMaybe (parseList parseATACSeq)
-  where
-    readYml :: FilePath -> IO (HM.HashMap (CI T.Text) Value)
-    readYml fl = do
-        result <- decodeFile fl
-        case result of
-            Nothing  -> error "Unable to read input file. Formatting error!"
-            Just dat -> return $ HM.fromList $ map (first mk) $ HM.toList dat
+readATACSeq input key = readFromFile input key parseATACSeq
+
+readRNASeq :: FilePath -> T.Text
+            -> IO [RNASeq [MaybePairSomeFile]]
+readRNASeq input key = readFromFile input key parseRNASeq
 
 parseATACSeq :: Value -> Parser (ATACSeq [MaybePairSomeFile])
 parseATACSeq = withObject "ATACSeq" $ \obj' -> do
@@ -151,6 +147,20 @@ parseRNASeq = withObject "RNASeq" $ \obj' -> do
     let obj = toLowerKey obj'
     RNASeq <$> parseCommonFields (Object obj') <*>
                 obj .:? "pairedend" .!= False
+
+readFromFile :: FilePath -> T.Text -> (Value -> Parser a)
+            -> IO [a]
+readFromFile input key parser = do
+    dat <- readYml input
+    return $ fromMaybe [] $ HM.lookup (mk key) dat >>= parseMaybe (parseList parser)
+  where
+    readYml :: FilePath -> IO (HM.HashMap (CI T.Text) Value)
+    readYml fl = do
+        result <- decodeFile fl
+        case result of
+            Nothing  -> error "Unable to read input file. Formatting error!"
+            Just dat -> return $ HM.fromList $ map (first mk) $ HM.toList dat
+{-# INLINE readFromFile #-}
 
                 {-
 parseHiC :: Value -> Parser HiC
