@@ -59,6 +59,8 @@ $(singletons [d|
     data FileTag = Sorted
                  | Pairend
                  | Gzip
+                 | GeneQuant
+                 | TranscriptQuant
         deriving (Show, Read, Eq, Ord, Generic)
     |])
 
