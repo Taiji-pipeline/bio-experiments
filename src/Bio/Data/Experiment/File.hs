@@ -80,11 +80,6 @@ makeFields ''File
 deriveJSON defaultOptions ''File
 instance Serialize (File filetags filetype)
 
-getFileType :: forall tags (filetype :: FileType) . SingI filetype
-            => File tags filetype -> FileType
-getFileType _ = fromSing (sing :: Sing filetype)
-
-
 -- | Opaque File
 data SomeFile where
     SomeFile :: (SingI filetype, SingI filetags)
@@ -120,21 +115,27 @@ instance FromJSON SomeFile where
                 SomeSing (ft :: SFileType ft) -> withSingI tag $ withSingI ft $
                     SomeFile <$> (obj .: "data" :: _ (File tags ft))
 
-someFileIs :: SomeFile -> FileType -> Bool
-someFileIs fl ft = case fl of
-    SomeFile fl' -> getFileType fl' == ft
-
 fromSomeFile :: SomeFile -> File tag filetype
 fromSomeFile x = case x of
     SomeFile fl -> coerce fl
 
+class FileInfo f where
+    getFileType :: f -> FileType
+    getFileTags :: f -> [FileTag]
+
+instance (SingI tags, SingI filetype) => FileInfo (File tags filetype) where
+    getFileType _ = fromSing (sing :: Sing filetype)
+    getFileTags _ = fromSing (sing :: Sing tags)
+
+instance FileInfo SomeFile where
+    getFileType fl = case fl of
+        SomeFile fl' -> getFileType fl'
+    getFileTags fl = case fl of
+        SomeFile fl' -> getFileTags fl'
+
 data SomeTags filetype where
     SomeTags :: SingI filetags
              => File filetags filetype -> SomeTags filetype
-
-type FilePair tags filetype = (File tags filetype, File tags filetype)
-type MaybePair tags1 tags2 filetype = Either (File tags1 filetype) (FilePair tags2 filetype)
-type EitherTag tags1 tags2 filetype = Either (File tags1 filetype) (File tags2 filetype)
 
 data FileList :: [[FileTag]] -> [FileType] -> * where
     FNil :: FileList '[] '[]

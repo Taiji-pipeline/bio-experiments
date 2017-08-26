@@ -14,9 +14,6 @@ module Bio.Data.Experiment
     ( FileType(..)
     , FileTag(..)
     , File
-    , FilePair
-    , MaybePair
-    , EitherTag
     , SomeFile(..)
     , SomeTags(..)
     , FileList(..)
@@ -29,18 +26,17 @@ module Bio.Data.Experiment
     , info
     , number
     , Experiment(..)
-    , MaybePairExp
 
     , ATACSeq
     , RNASeq
 
     , hasTag
 
+    , FileInfo(..)
+
     , AllC
     , splitExpByFile
     , splitExpByFileEither
-    , getFileType
-    , someFileIs
     , fromSomeFile
     , mergeExps
     ) where
