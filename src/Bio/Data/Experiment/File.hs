@@ -119,17 +119,25 @@ fromSomeFile :: SomeFile -> File tag filetype
 fromSomeFile x = case x of
     SomeFile fl -> coerce fl
 
-class FileInfo f where
+class FileTypeInfo f where
     getFileType :: f -> FileType
-    getFileTags :: f -> [FileTag]
 
-instance (SingI tags, SingI filetype) => FileInfo (File tags filetype) where
+instance SingI filetype => FileTypeInfo (File tags filetype) where
     getFileType _ = fromSing (sing :: Sing filetype)
-    getFileTags _ = fromSing (sing :: Sing tags)
 
-instance FileInfo SomeFile where
+instance FileTypeInfo SomeFile where
     getFileType fl = case fl of
         SomeFile fl' -> getFileType fl'
+
+class FileTagInfo f where
+    getFileTags :: f -> [FileTag]
+    hasTag :: f -> FileTag -> Bool
+    hasTag x t = t `elem` getFileTags x
+
+instance SingI tags => FileTagInfo (File tags filetype) where
+    getFileTags _ = fromSing (sing :: Sing tags)
+
+instance FileTagInfo SomeFile where
     getFileTags fl = case fl of
         SomeFile fl' -> getFileTags fl'
 

@@ -30,9 +30,8 @@ module Bio.Data.Experiment
     , ATACSeq
     , RNASeq
 
-    , hasTag
-
-    , FileInfo(..)
+    , FileTagInfo(..)
+    , FileTypeInfo(..)
 
     , AllC
     , splitExpByFile
@@ -59,9 +58,11 @@ import           Bio.Data.Experiment.Replicate
 import           Bio.Data.Experiment.RNASeq
 import           Bio.Data.Experiment.Types
 
+{-
 hasTag :: forall tags filetype . SingI tags
        => File tags filetype -> FileTag -> Bool
 hasTag _ t = t `elem` fromSing (sing :: SList tags)
+-}
 
 emptyFile :: File tags filetype
 emptyFile = File
