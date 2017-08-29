@@ -16,12 +16,16 @@ import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
 import qualified Data.Text                     as T
 import           GHC.Generics                  (Generic)
-import Data.Functor.Identity (Identity)
+import Data.Functor.Identity
 
 import           Bio.Data.Experiment.Replicate
 
 type S = Identity
 type N = []
+
+instance Serialize a => Serialize (Identity a) where
+    put (Identity x) = put x
+    get = Identity <$> get
 
 -- | A set of fields that exist in all kinds of Assays
 data CommonFields container file = CommonFields
