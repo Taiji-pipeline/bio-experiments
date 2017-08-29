@@ -82,6 +82,28 @@ instance Experiment e => Splitter (e N [f]) where
     split e = zipWith (\x y -> replicates .~ return x $ y)
         (concatMap split $ e^.replicates) $ repeat e
 
+instance Experiment e => Splitter (e S (Either f1 f2)) where
+    type SplitResult (e S (Either f1 f2)) = Either (e S f1) (e S f2)
+    split e = case runIdentity (e^.replicates) ^. files of
+        Left fl -> [Left $ replicates.mapped.files .~ fl $ e]
+        Right fl -> [Right $ replicates.mapped.files .~ fl $ e]
+
+{-
+splitExpByFileEither :: Experiment e
+                     => e [Either f1 f2]
+                     -> Maybe [Either (e f1) (e f2)]
+splitExpByFileEither e = if not (null lf) && not (null rt)
+    then Nothing
+    else Just $ map (bimap (\x -> replicates .~ [x] $ e)
+        (\x -> replicates .~ [x] $ e)) reps
+  where
+    (lf, rt) = partitionEithers reps
+    reps = concatMap f $ e^.replicates
+    f :: Replicate [Either f1 f2] -> [Either (Replicate f1) (Replicate f2)]
+    f r = map (bimap (\x -> files .~ x $ r) (\x -> files .~ x $ r)) $ r^.files
+{-# INLINE splitExpByFileEither #-}
+-}
+
 class Merger a where
     type MergeResult a :: *
     merge :: [a] -> [MergeResult a]
