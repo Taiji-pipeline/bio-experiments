@@ -11,28 +11,37 @@
 module Bio.Data.Experiment.Types where
 
 import           Control.Lens                  (makeLenses, Lens', Lens)
-import           Data.Aeson.TH       (defaultOptions, deriveJSON)
+import           Data.Aeson
 import           Data.Serialize      (Serialize (..))
 import           Data.Serialize.Text ()
 import qualified Data.Text                     as T
 import           GHC.Generics                  (Generic)
+import Data.Functor.Identity (Identity)
 
 import           Bio.Data.Experiment.Replicate
-import           Bio.Data.Experiment.File
+
+type S = Identity
+type N = []
 
 -- | A set of fields that exist in all kinds of Assays
-data CommonFields file = CommonFields
+data CommonFields container file = CommonFields
     { _commonEid        :: !T.Text
     , _commonGroupName  :: !(Maybe T.Text)
     , _commonSampleName :: !T.Text
-    , _commonReplicates :: [Replicate file]
+    , _commonReplicates :: container (Replicate file)
     } deriving (Generic)
 
 makeLenses ''CommonFields
-deriveJSON defaultOptions ''CommonFields
-instance Serialize file => Serialize (CommonFields file)
 
-defaultCommonFields :: CommonFields file
+instance FromJSON (container (Replicate file))
+    => FromJSON (CommonFields container file)
+
+instance ToJSON (container (Replicate file))
+    => ToJSON (CommonFields container file)
+
+instance Serialize (container (Replicate file)) => Serialize (CommonFields container file)
+
+defaultCommonFields :: CommonFields N file
 defaultCommonFields = CommonFields
     { _commonEid = ""
     , _commonGroupName = Nothing
@@ -41,21 +50,24 @@ defaultCommonFields = CommonFields
     }
 
 class Experiment e where
-    commonFields :: Lens (e file1) (e file2) (CommonFields file1) (CommonFields file2)
+    commonFields :: Lens (e container1 file1)
+                         (e container2 file2)
+                         (CommonFields container1 file1)
+                         (CommonFields container2 file2)
 
-    eid :: Lens' (e file1) T.Text
+    eid :: Lens' (e c file1) T.Text
     eid = commonFields . commonEid
 
-    groupName :: Lens' (e file1) (Maybe T.Text)
+    groupName :: Lens' (e c file1) (Maybe T.Text)
     groupName = commonFields . commonGroupName
 
-    sampleName :: Lens' (e file1) T.Text
+    sampleName :: Lens' (e c file1) T.Text
     sampleName = commonFields . commonSampleName
 
-    replicates :: Lens (e file1) (e file2) [Replicate file1] [Replicate file2]
+    replicates :: Lens (e container1 file1)
+                       (e container2 file2)
+                       (container1 (Replicate file1))
+                       (container2 (Replicate file2))
     replicates = commonFields . commonReplicates
 
     {-# MINIMAL commonFields #-}
-
-type MaybePairExp e tags1 tags2 filetype = Either (e (File tags1 filetype))
-    (e (File tags2 filetype, File tags2 filetype))

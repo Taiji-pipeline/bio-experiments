@@ -1,23 +1,23 @@
 {-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE TemplateHaskell        #-}
 module Bio.Data.Experiment.Replicate where
 
-import Data.Map.Strict (Map)
-import qualified Data.Text as T
-import           GHC.Generics        (Generic)
-import           Control.Lens        (makeFields, Lens)
-import           Data.Aeson.TH       (defaultOptions, deriveJSON)
-import           Data.Serialize      (Serialize (..))
-import           Data.Serialize.Text ()
+import           Control.Lens             (Lens, makeFields)
+import           Data.Aeson.TH            (defaultOptions, deriveJSON)
+import           Data.Map.Strict          (Map)
+import           Data.Serialize           (Serialize (..))
+import           Data.Serialize.Text      ()
+import qualified Data.Text                as T
+import           GHC.Generics             (Generic)
 
 import Bio.Data.Experiment.File
 
 data Replicate file = Replicate
-    { replicateFiles  :: file
+    { replicateFiles   :: file
     , _replicateInfo   :: (Map T.Text T.Text)
     , _replicateNumber :: Int
     }

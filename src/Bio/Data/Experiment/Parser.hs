@@ -110,7 +110,7 @@ parseReplicate = withObject "Replicate" $ \obj' -> do
                   obj .:? "rep" .!= 0
 
 parseCommonFields :: Value
-                  -> Parser (CommonFields [MaybePairSomeFile])
+                  -> Parser (CommonFields N [MaybePairSomeFile])
 parseCommonFields = withObject "CommonFields" $ \obj' -> do
     let obj = toLowerKey obj'
     CommonFields <$> obj .: "id" <*>
@@ -129,20 +129,20 @@ parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
                 -}
 
 readATACSeq :: FilePath -> T.Text
-            -> IO [ATACSeq [MaybePairSomeFile]]
+            -> IO [ATACSeq N [MaybePairSomeFile]]
 readATACSeq input key = readFromFile input key parseATACSeq
 
 readRNASeq :: FilePath -> T.Text
-            -> IO [RNASeq [MaybePairSomeFile]]
+            -> IO [RNASeq N [MaybePairSomeFile]]
 readRNASeq input key = readFromFile input key parseRNASeq
 
-parseATACSeq :: Value -> Parser (ATACSeq [MaybePairSomeFile])
+parseATACSeq :: Value -> Parser (ATACSeq N [MaybePairSomeFile])
 parseATACSeq = withObject "ATACSeq" $ \obj' -> do
     let obj = toLowerKey obj'
     ATACSeq <$> parseCommonFields (Object obj') <*>
                 obj .:? "pairedend" .!= False
 
-parseRNASeq :: Value -> Parser (RNASeq [MaybePairSomeFile])
+parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
 parseRNASeq = withObject "RNASeq" $ \obj' -> do
     let obj = toLowerKey obj'
     RNASeq <$> parseCommonFields (Object obj') <*>
