@@ -36,7 +36,6 @@ import           Data.Coerce                   (coerce)
 import qualified Data.HashMap.Strict           as HM
 import           Data.List                     (foldl', nub)
 import qualified Data.Map.Strict               as M
-import           Data.Maybe                    (fromMaybe)
 import           Data.Singletons
 import qualified Data.Text                     as T
 import qualified Data.Vector                   as V
@@ -148,11 +147,16 @@ parseRNASeq = withObject "RNASeq" $ \obj' -> do
     RNASeq <$> parseCommonFields (Object obj') <*>
                 obj .:? "pairedend" .!= False
 
-readFromFile :: FilePath -> T.Text -> (Value -> Parser a)
-            -> IO [a]
+readFromFile :: FilePath
+             -> T.Text   -- ^ key
+             -> (Value -> Parser a) -> IO [a]
 readFromFile input key parser = do
     dat <- readYml input
-    return $ fromMaybe [] $ HM.lookup (mk key) dat >>= parseMaybe (parseList parser)
+    case HM.lookup (mk key) dat of
+        Nothing -> return []
+        Just x -> case parseEither (parseList parser) x of
+            Left err -> error err
+            Right r  -> return r
   where
     readYml :: FilePath -> IO (HM.HashMap (CI T.Text) Value)
     readYml fl = do
