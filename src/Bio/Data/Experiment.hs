@@ -1,15 +1,12 @@
-{-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE PolyKinds            #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds        #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
 
 module Bio.Data.Experiment
     ( FileType(..)
@@ -40,6 +37,7 @@ module Bio.Data.Experiment
     , RNASeq
 
     , AllC
+    , Insert'
     , Splitter(..)
     , Merger(..)
     ) where
@@ -50,6 +48,8 @@ import           Data.List                     (groupBy, sortBy)
 import qualified Data.Map.Strict               as M
 import           Data.Monoid                   ((<>))
 import           Data.Ord                      (comparing)
+import           Data.Promotion.Prelude.List   (Elem, Insert)
+import           Data.Singletons.Prelude.Bool  (If)
 import           GHC.Exts                      (Constraint)
 
 import           Bio.Data.Experiment.ATACSeq
@@ -69,47 +69,35 @@ type family AllC (c :: k -> Constraint) (xs :: [k]) :: Constraint where
     AllC c '[] = ()
     AllC c (x ': xs) = (c x, AllC c xs)
 
-class Splitter a where
-    type SplitResult a :: *
-    split :: a -> [SplitResult a]
+type Insert' x xs = If (Elem x xs) xs (Insert x xs)
 
-instance Splitter (Replicate [f]) where
-    type SplitResult (Replicate [f]) = Replicate f
+class Splitter a b | a -> b where
+    split :: a -> [b]
+
+instance Splitter (Replicate [f]) (Replicate f) where
     split r = zipWith (\x y -> files .~ x $ y) (r^.files) $ repeat r
+    {-# INLINE split #-}
 
-instance Experiment e => Splitter (e N [f]) where
-    type SplitResult (e N [f]) = e S f
+instance Experiment e => Splitter (e N f) (e S f) where
     split e = zipWith (\x y -> replicates .~ return x $ y)
-        (concatMap split $ e^.replicates) $ repeat e
+        (e^.replicates) $ repeat e
+    {-# INLINE split #-}
 
-instance Experiment e => Splitter (e S (Either f1 f2)) where
-    type SplitResult (e S (Either f1 f2)) = Either (e S f1) (e S f2)
+instance Experiment e => Splitter (e S [f]) (e S f) where
+    split e = zipWith (\x y -> replicates .~ return x $ y)
+        (split $ runIdentity $ e^.replicates) $ repeat e
+    {-# INLINE split #-}
+
+instance Experiment e => Splitter (e S (Either f1 f2)) (Either (e S f1) (e S f2)) where
     split e = case runIdentity (e^.replicates) ^. files of
-        Left fl -> [Left $ replicates.mapped.files .~ fl $ e]
+        Left fl  -> [Left $ replicates.mapped.files .~ fl $ e]
         Right fl -> [Right $ replicates.mapped.files .~ fl $ e]
+    {-# INLINE split #-}
 
-{-
-splitExpByFileEither :: Experiment e
-                     => e [Either f1 f2]
-                     -> Maybe [Either (e f1) (e f2)]
-splitExpByFileEither e = if not (null lf) && not (null rt)
-    then Nothing
-    else Just $ map (bimap (\x -> replicates .~ [x] $ e)
-        (\x -> replicates .~ [x] $ e)) reps
-  where
-    (lf, rt) = partitionEithers reps
-    reps = concatMap f $ e^.replicates
-    f :: Replicate [Either f1 f2] -> [Either (Replicate f1) (Replicate f2)]
-    f r = map (bimap (\x -> files .~ x $ r) (\x -> files .~ x $ r)) $ r^.files
-{-# INLINE splitExpByFileEither #-}
--}
+class Merger a b | a -> b where
+    merge :: [a] -> [b]
 
-class Merger a where
-    type MergeResult a :: *
-    merge :: [a] -> [MergeResult a]
-
-instance Merger (Replicate f) where
-    type MergeResult (Replicate f) = Replicate [f]
+instance Merger (Replicate f) (Replicate [f]) where
     merge rs = map combineRep repGroup
       where
         repGroup = groupBy ((==) `on` (^.number)) $ sortBy (comparing (^.number)) rs
@@ -118,9 +106,9 @@ instance Merger (Replicate f) where
             infos = M.fromListWith f $ concatMap (M.toList . (^.info)) reps
             f a b | a == b = a
                   | otherwise = a <> " | " <> b
+    {-# INLINE merge #-}
 
-instance Experiment e => Merger (e S f) where
-    type MergeResult (e S f) = e N [f]
+instance Experiment e => Merger (e S f) (e N [f]) where
     merge = map combineExp . groupBy ((==) `on` (^.eid)) .
         sortBy (comparing (^.eid))
       where
@@ -131,19 +119,12 @@ instance Experiment e => Merger (e S f) where
                 else error "Abort: Found experiments with same id but with different contents"
         allEqual (x:xs) = all (==x) xs
         allEqual _      = True
+    {-# INLINE merge #-}
 
 {-
-splitExpByFileEither :: Experiment e
-                     => e [Either f1 f2]
-                     -> Maybe [Either (e f1) (e f2)]
-splitExpByFileEither e = if not (null lf) && not (null rt)
-    then Nothing
-    else Just $ map (bimap (\x -> replicates .~ [x] $ e)
-        (\x -> replicates .~ [x] $ e)) reps
-  where
-    (lf, rt) = partitionEithers reps
-    reps = concatMap f $ e^.replicates
-    f :: Replicate [Either f1 f2] -> [Either (Replicate f1) (Replicate f2)]
-    f r = map (bimap (\x -> files .~ x $ r) (\x -> files .~ x $ r)) $ r^.files
-{-# INLINE splitExpByFileEither #-}
+zipExp :: Experiment e
+       => [e S file1]
+       -> [e S file2]
+       -> [e S (file1, file2)]
+zipExp xs ys =
 -}

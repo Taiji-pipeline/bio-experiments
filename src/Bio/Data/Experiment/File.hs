@@ -61,6 +61,7 @@ $(singletons [d|
                  | Gzip
                  | GeneQuant
                  | TranscriptQuant
+                 | Filtered
         deriving (Show, Read, Eq, Ord, Generic)
     |])
 
