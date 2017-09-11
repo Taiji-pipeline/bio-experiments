@@ -35,27 +35,28 @@ module Bio.Data.Experiment
 
     , ATACSeq
     , RNASeq
+    , HiC
 
     , AllC
     , Insert'
     , Splitter(..)
     , Merger(..)
+    , zipExp
     ) where
 
 import           Control.Lens
 import           Data.Function                 (on)
 import           Data.List                     (groupBy, sortBy)
 import qualified Data.Map.Strict               as M
+import           Data.Maybe                    (mapMaybe)
 import           Data.Monoid                   ((<>))
 import           Data.Ord                      (comparing)
 import           Data.Promotion.Prelude.List   (Elem, Insert)
 import           Data.Singletons.Prelude.Bool  (If)
 import           GHC.Exts                      (Constraint)
 
-import           Bio.Data.Experiment.ATACSeq
 import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Replicate
-import           Bio.Data.Experiment.RNASeq
 import           Bio.Data.Experiment.Types
 
 emptyFile :: File tags filetype
@@ -121,10 +122,18 @@ instance Experiment e => Merger (e S f) (e N [f]) where
         allEqual _      = True
     {-# INLINE merge #-}
 
-{-
 zipExp :: Experiment e
        => [e S file1]
        -> [e S file2]
        -> [e S (file1, file2)]
-zipExp xs ys =
--}
+zipExp xs ys = flip mapMaybe xs $ \x ->
+    let k = (x^.eid, runIdentity (x^.replicates) ^. number)
+    in zip' x <$> M.lookup k ys'
+  where
+    ys' = M.fromListWithKey raiseErr $ map (\x ->
+        ( (x^.eid, runIdentity (x^.replicates) ^. number)
+        , runIdentity (x^.replicates) ^. files )
+        ) ys
+    raiseErr k _ _ = error $ "Duplicate records: " ++ show k
+    zip' e x = e & replicates.mapped.files %~ (\f -> (f, x))
+{-# INLINE zipExp #-}

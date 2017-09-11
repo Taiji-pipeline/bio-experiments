@@ -23,6 +23,7 @@
 module Bio.Data.Experiment.Parser
     ( readATACSeq
     , readRNASeq
+    , readHiC
     , parseRNASeq
     , guessFormat
     ) where
@@ -41,10 +42,8 @@ import qualified Data.Text                     as T
 import qualified Data.Vector                   as V
 import           Data.Yaml
 
-import           Bio.Data.Experiment.ATACSeq
 import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Replicate
-import           Bio.Data.Experiment.RNASeq
 import           Bio.Data.Experiment.Types
 
 type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
@@ -135,17 +134,24 @@ readRNASeq :: FilePath -> T.Text
             -> IO [RNASeq N [MaybePairSomeFile]]
 readRNASeq input key = readFromFile input key parseRNASeq
 
+readHiC :: FilePath -> T.Text
+        -> IO [HiC N [MaybePairSomeFile]]
+readHiC input key = readFromFile input key parseHiC
+
 parseATACSeq :: Value -> Parser (ATACSeq N [MaybePairSomeFile])
 parseATACSeq = withObject "ATACSeq" $ \obj' -> do
     let obj = toLowerKey obj'
-    ATACSeq <$> parseCommonFields (Object obj') <*>
-                obj .:? "pairedend" .!= False
+    ATACSeq <$> parseCommonFields (Object obj)
 
 parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
 parseRNASeq = withObject "RNASeq" $ \obj' -> do
     let obj = toLowerKey obj'
-    RNASeq <$> parseCommonFields (Object obj') <*>
-                obj .:? "pairedend" .!= False
+    RNASeq <$> parseCommonFields (Object obj)
+
+parseHiC :: Value -> Parser (HiC N [MaybePairSomeFile])
+parseHiC = withObject "HiC" $ \obj' -> do
+    let obj = toLowerKey obj'
+    HiC <$> parseCommonFields (Object obj)
 
 readFromFile :: FilePath
              -> T.Text   -- ^ key
@@ -165,13 +171,6 @@ readFromFile input key parser = do
             Nothing  -> error "Unable to read input file. Formatting error!"
             Just dat -> return $ HM.fromList $ map (first mk) $ HM.toList dat
 {-# INLINE readFromFile #-}
-
-                {-
-parseHiC :: Value -> Parser HiC
-parseHiC = withObject "HiC" $ \obj' -> do
-    let obj = toLowerKey obj'
-    HiC <$> parseCommonFields (Object obj')
-    -}
 
 
 --------------------------------------------------------------------------------

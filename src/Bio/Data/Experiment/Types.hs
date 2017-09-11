@@ -1,22 +1,24 @@
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DeriveGeneric        #-}
-{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
+
 module Bio.Data.Experiment.Types where
 
-import           Control.Lens                  (makeLenses, Lens', Lens)
+import           Control.Lens                  (Lens, Lens', makeLenses)
 import           Data.Aeson
-import           Data.Serialize      (Serialize (..))
-import           Data.Serialize.Text ()
+import           Data.Functor.Identity
+import           Data.Serialize                (Serialize (..))
+import           Data.Serialize.Text           ()
 import qualified Data.Text                     as T
 import           GHC.Generics                  (Generic)
-import Data.Functor.Identity
 
 import           Bio.Data.Experiment.Replicate
 
@@ -75,3 +77,54 @@ class Experiment e where
     replicates = commonFields . commonReplicates
 
     {-# MINIMAL commonFields #-}
+
+
+-- | ATAC-seq
+data ATACSeq container file = ATACSeq
+    { atacseqCommon    :: CommonFields container file
+    } deriving (Generic)
+
+instance FromJSON (CommonFields container file)
+    => FromJSON (ATACSeq container file)
+
+instance ToJSON (CommonFields container file)
+    => ToJSON (ATACSeq container file)
+
+instance Serialize (CommonFields container file) => Serialize (ATACSeq container file)
+
+instance Experiment ATACSeq where
+    commonFields f e = (\x -> e{atacseqCommon = x}) <$> f (atacseqCommon e)
+
+
+-- | RNA-seq
+data RNASeq container file = RNASeq
+    { rnaseqCommon    :: CommonFields container file
+    } deriving (Generic)
+
+instance FromJSON (CommonFields container file)
+    => FromJSON (RNASeq container file)
+
+instance ToJSON (CommonFields container file)
+    => ToJSON (RNASeq container file)
+
+instance Serialize (CommonFields container file) => Serialize (RNASeq container file)
+
+instance Experiment RNASeq where
+    commonFields f e = (\x -> e{rnaseqCommon = x}) <$> f (rnaseqCommon e)
+
+
+-- | HiC
+data HiC container file = HiC
+    { hicCommon    :: CommonFields container file
+    } deriving (Generic)
+
+instance FromJSON (CommonFields container file)
+    => FromJSON (HiC container file)
+
+instance ToJSON (CommonFields container file)
+    => ToJSON (HiC container file)
+
+instance Serialize (CommonFields container file) => Serialize (HiC container file)
+
+instance Experiment HiC where
+    commonFields f e = (\x -> e{hicCommon = x}) <$> f (hicCommon e)

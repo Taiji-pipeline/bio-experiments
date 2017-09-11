@@ -20,8 +20,6 @@ library
                        Bio.Data.Experiment.Types
                        Bio.Data.Experiment.File
                        Bio.Data.Experiment.Replicate
-                       Bio.Data.Experiment.RNASeq
-                       Bio.Data.Experiment.ATACSeq
                        Bio.Data.Experiment.Parser
   build-depends:       base >= 4.7 && < 5
                      , aeson
