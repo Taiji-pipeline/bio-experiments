@@ -62,6 +62,7 @@ $(singletons [d|
                  | GeneQuant
                  | TranscriptQuant
                  | Filtered
+                 | ENCODE
         deriving (Show, Read, Eq, Ord, Generic)
     |])
 
