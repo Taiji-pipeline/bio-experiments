@@ -20,7 +20,8 @@ module Bio.Data.Experiment
     , SomeFile(..)
     , fromSomeFile
     , SomeTags(..)
-    , FileList(..)
+    , fromSomeTags
+    , castFile
 
     , FileTagInfo(..)
     , FileTypeInfo(..)

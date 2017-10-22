@@ -121,6 +121,39 @@ fromSomeFile :: SomeFile -> File tag filetype
 fromSomeFile x = case x of
     SomeFile fl -> coerce fl
 
+data SomeTags filetype where
+    SomeTags :: SingI filetags
+             => File filetags filetype -> SomeTags filetype
+
+instance Serialize (SomeTags filetype) where
+    put fl = case fl of
+        SomeTags (fl' :: File filetag filetype) -> do
+            put $ fromSing (sing :: Sing filetag)
+            put fl'
+    get = do
+        filetags <- get :: _ [FileTag]
+        case toSing filetags of
+            SomeSing (tag :: Sing tags) -> withSingI tag $
+                SomeTags <$> (get :: _ (File tags filetype))
+
+instance ToJSON (SomeTags filetype) where
+    toJSON fl = case fl of
+        SomeTags (fl' :: File filetag filetype) -> object
+            [ "filetag" .= fromSing (sing :: Sing filetag)
+            , "data" .= fl' ]
+
+instance FromJSON (SomeTags filetype) where
+    parseJSON = withObject "SomeFile" $ \obj -> do
+        filetags <- obj .: "filetag" :: _ [FileTag]
+        case toSing filetags of
+            SomeSing (tag :: Sing tags) -> withSingI tag $
+                SomeTags <$> (obj .: "data" :: _ (File tags filetype))
+
+fromSomeTags :: SomeTags filetype -> File tag filetype
+fromSomeTags x = case x of
+    SomeTags fl -> coerce fl
+{-# INLINE fromSomeTags #-}
+
 class FileTypeInfo f where
     getFileType :: f -> FileType
 
@@ -130,6 +163,9 @@ instance SingI filetype => FileTypeInfo (File tags filetype) where
 instance FileTypeInfo SomeFile where
     getFileType fl = case fl of
         SomeFile fl' -> getFileType fl'
+
+instance SingI filetype => FileTypeInfo (SomeTags filetype) where
+    getFileType _ = fromSing (sing :: Sing filetype)
 
 class FileTagInfo f where
     getFileTags :: f -> [FileTag]
@@ -143,53 +179,13 @@ instance FileTagInfo SomeFile where
     getFileTags fl = case fl of
         SomeFile fl' -> getFileTags fl'
 
-data SomeTags filetype where
-    SomeTags :: SingI filetags
-             => File filetags filetype -> SomeTags filetype
+instance FileTagInfo (SomeTags filetype) where
+    getFileTags fl = case fl of
+        SomeTags fl' -> getFileTags fl'
 
-data FileList :: [[FileTag]] -> [FileType] -> * where
-    FNil :: FileList '[] '[]
-    FCons :: File tag filetype
-          -> FileList tags filetypes
-          -> FileList (tag ': tags) (filetype ': filetypes)
 
-instance Serialize (FileList '[] '[]) where
-    put _ = put (0 :: Int)
-    get = do
-        i <- get
-        case (i :: Int) of
-            0 -> return FNil
-            _ -> error "decode fail"
-
-instance Serialize (FileList tags filetypes) =>
-    Serialize (FileList (tag ': tags) (filetype ': filetypes) ) where
-        put (FCons x xs) = put x >> put xs
-        get = FCons <$> get <*> get
-
-instance ToJSON (FileList tags filetypes) where
-    toJSON fs = Array $ V.fromList $ go fs
-        where
-          go :: FileList tags' filetypes' -> [Value]
-          go FNil         = []
-          go (FCons x xs) = toJSON x : go xs
-
-instance FromJSON (FileList '[] '[]) where
-    parseJSON = withArray "FileList" $ \xs -> if V.null xs
-        then return FNil
-        else error "Non-mepty List"
-
-instance FromJSON (FileList tags filetypes) =>
-    FromJSON (FileList (tag ': tags) (filetype ': filetypes)) where
-        parseJSON = withArray "FileList" (go . V.toList)
-          where
-            go (x:xs) = FCons <$> parseJSON x <*> parseJSON (Array $ V.fromList xs)
-            go _ = error "Not enough length"
-
-type family BioData filetype :: Bool where
-    BioData (f1, f2) = BioData f1 && BioData f2
-    BioData (File tags f) = 'True
-    BioData [f] = BioData f
-    BioData (Either f1 f2) = BioData f1 && BioData f2
-    BioData (FileList tags filetypes) = 'True
-    BioData a = TypeError ( 'Text "type ‘" ':<>:
-        'ShowType a ':<>: 'Text "’ is not an instance of 'BioData'.")
+castFile :: SomeFile -> SomeTags filetype
+castFile fl = case fl of
+    SomeFile (fl' :: File filetags _) ->
+        SomeTags (coerce fl' :: File filetags filetype)
+{-# INLINE castFile #-}
