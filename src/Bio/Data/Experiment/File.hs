@@ -63,6 +63,7 @@ $(singletons [d|
                  | TranscriptQuant
                  | Filtered
                  | ENCODE
+                 | ChromosomeLoop
         deriving (Show, Read, Eq, Ord, Generic)
     |])
 
