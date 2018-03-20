@@ -1,38 +1,40 @@
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE EmptyCase              #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE InstanceSigs           #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE PartialTypeSignatures  #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE InstanceSigs #-}
 
 module Bio.Data.Experiment.File where
 
-import           Control.Lens              (makeFields)
-import           Data.Aeson                (FromJSON (..), ToJSON (..),
-                                            Value (..), withArray, (.=), object, withObject, (.:))
-import           Data.Aeson.TH             (defaultOptions, deriveJSON)
-import qualified Data.Map.Strict           as M
+import           Control.Lens            (makeFields)
+import           Data.Aeson              (FromJSON (..), ToJSON (..),
+                                          Value (..), object, withArray,
+                                          withObject, (.:), (.=))
+import           Data.Aeson.TH           (defaultOptions, deriveJSON)
+import           Data.Coerce             (coerce)
+import qualified Data.Map.Strict         as M
 import           Data.Promotion.Prelude
+import           Data.Serialize          (Serialize (..))
+import           Data.Serialize.Text     ()
 import           Data.Singletons.Prelude
-import           Data.Serialize            (Serialize (..))
-import           Data.Serialize.Text       ()
 import           Data.Singletons.TH
-import qualified Data.Text                 as T
+import qualified Data.Text               as T
 import           Data.Type.Bool
-import qualified Data.Vector               as V
-import           GHC.Generics              (Generic)
+import qualified Data.Vector             as V
+import           GHC.Generics            (Generic)
 import           GHC.TypeLits
-import           Data.Coerce                   (coerce)
 
 -- | Formats of files
 $(singletons [d|
@@ -75,7 +77,6 @@ instance Serialize FileTag
 data File (filetags :: [FileTag]) (filetype :: FileType) where
     File :: { fileLocation :: FilePath
             , fileInfo     :: (M.Map T.Text T.Text)
-            , fileTags     :: [FileTag]
             } -> File filetags filetype
             deriving (Show, Read, Generic)
 

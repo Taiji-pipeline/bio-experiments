@@ -14,7 +14,6 @@ module Bio.Data.Experiment
 
     , File
     , location
-    , tags
     , emptyFile
 
     , SomeFile(..)
@@ -64,7 +63,6 @@ emptyFile :: File tags filetype
 emptyFile = File
     { fileLocation = ""
     , fileInfo = M.empty
-    , fileTags = []
     }
 
 type family AllC (c :: k -> Constraint) (xs :: [k]) :: Constraint where

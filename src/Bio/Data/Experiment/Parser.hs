@@ -61,7 +61,7 @@ parseFile = withObject "File" $ \obj' -> do
     format <- obj .:? "format" .!= guessFormat path
     tags <- fmap (\x -> nub $ if gzipped path then Gzip : x else x) $
         obj .:? "tags" .!= []
-    fl <- File <$> return path <*> obj .:? "info" .!= M.empty <*> return []
+    fl <- File <$> return path <*> obj .:? "info" .!= M.empty
     return $ foldl' f (g (SomeFile (fl :: File '[] 'Other)) format) tags
   where
     f fl tag = case fl of
