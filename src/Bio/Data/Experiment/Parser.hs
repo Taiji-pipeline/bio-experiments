@@ -150,7 +150,7 @@ readHiC :: FilePath -> T.Text
         -> IO [HiC N [MaybePairSomeFile]]
 readHiC input key = readFromFile input key parseHiC
 
-readHiCTSV :: FilePath -> T.Text -> IO [RNASeq N [MaybePairSomeFile]]
+readHiCTSV :: FilePath -> T.Text -> IO [HiC N [MaybePairSomeFile]]
 readHiCTSV input key = do
     tsv <- readTSV input
     return $ merge $ map (HiC . mapToCommonFields) $
