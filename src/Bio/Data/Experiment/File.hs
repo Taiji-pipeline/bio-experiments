@@ -24,6 +24,7 @@ import           Data.Aeson              (FromJSON (..), ToJSON (..),
                                           withObject, (.:), (.=))
 import           Data.Aeson.TH           (defaultOptions, deriveJSON)
 import           Data.Coerce             (coerce)
+import           Data.List               (foldl')
 import qualified Data.Map.Strict         as M
 import           Data.Promotion.Prelude
 import           Data.Serialize          (Serialize (..))
@@ -191,3 +192,22 @@ castFile fl = case fl of
     SomeFile (fl' :: File filetags _) ->
         SomeTags (coerce fl' :: File filetags filetype)
 {-# INLINE castFile #-}
+
+addTags :: [FileTag] -> SomeFile -> SomeFile
+addTags ts file = foldl' f file ts
+  where
+    f fl tag = case fl of
+        SomeFile fl' -> case toSing tag of
+            SomeSing tag' -> withSingI tag' $ SomeFile $ addTag tag' fl'
+    addTag :: SFileTag tag -> File tags ft -> File (tag ': tags) ft
+    addTag _ fl = coerce fl
+{-# INLINE addTags #-}
+
+setFiletype :: FileType -> SomeFile -> SomeFile
+setFiletype ft file = case file of
+    SomeFile fl' -> case toSing ft of
+        SomeSing ft' -> withSingI ft' $ SomeFile $ setFt ft' fl'
+  where
+    setFt :: SFileType ft' -> File tags ft -> File tags ft'
+    setFt _ fl = coerce fl
+{-# INLINE setFiletype #-}

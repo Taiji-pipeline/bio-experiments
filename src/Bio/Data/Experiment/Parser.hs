@@ -1,10 +1,3 @@
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE Rank2Types            #-}
-{-# LANGUAGE TypeOperators         #-}
 -- |
 -- Module:      Bio.Data.Experiment.Parser
 -- Copyright:   (c) 2017 Kai Zhang
@@ -20,9 +13,19 @@
 -- 2. Keywords are case-insensitive.
 -- 3. Providing default values for some fields.
 
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE TypeOperators         #-}
+
 module Bio.Data.Experiment.Parser
     ( readATACSeq
+    , readATACSeqTSV
     , readRNASeq
+    , readRNASeqTSV
     , readHiC
     , parseRNASeq
     , guessFormat
@@ -33,26 +36,21 @@ import           Data.Aeson
 import           Data.Aeson.Internal           (JSONPathElement (..), (<?>))
 import           Data.Aeson.Types
 import           Data.CaseInsensitive          (CI, mk)
-import           Data.Coerce                   (coerce)
+import           Data.Functor.Identity         (Identity (..))
 import qualified Data.HashMap.Strict           as HM
-import           Data.List                     (foldl', nub)
+import           Data.List                     (nub)
 import qualified Data.Map.Strict               as M
-import           Data.Singletons
 import qualified Data.Text                     as T
+import qualified Data.Text.IO                  as T
 import qualified Data.Vector                   as V
 import           Data.Yaml
 
 import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Replicate
 import           Bio.Data.Experiment.Types
+import           Bio.Data.Experiment
 
 type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
-
-addTag :: SFileTag tag -> File tags ft -> File (tag ': tags) ft
-addTag _ fl = coerce fl
-
-setFiletype :: SFileType ft' -> File tags ft -> File tags ft'
-setFiletype _ fl = coerce fl
 
 parseFile :: Value -> Parser SomeFile
 parseFile = withObject "File" $ \obj' -> do
@@ -62,14 +60,7 @@ parseFile = withObject "File" $ \obj' -> do
     tags <- fmap (\x -> nub $ if gzipped path then Gzip : x else x) $
         obj .:? "tags" .!= []
     fl <- File <$> return path <*> obj .:? "info" .!= M.empty
-    return $ foldl' f (g (SomeFile (fl :: File '[] 'Other)) format) tags
-  where
-    f fl tag = case fl of
-        SomeFile fl' -> case toSing tag of
-            SomeSing tag' -> withSingI tag' $ SomeFile $ addTag tag' fl'
-    g fl ft = case fl of
-        SomeFile fl' -> case toSing ft of
-            SomeSing ft' -> withSingI ft' $ SomeFile $ setFiletype ft' fl'
+    return $ addTags tags $ setFiletype format $ SomeFile (fl :: File '[] 'Other)
 
 parseFilePair :: Value -> Parser MaybePairSomeFile
 parseFilePair = withObject "FileSet" $ \obj' -> do
@@ -126,13 +117,33 @@ parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
                 obj .:? "control"
                 -}
 
+readTSV :: FilePath -> IO [HM.HashMap T.Text T.Text]
+readTSV input = do
+    c <- T.readFile input
+    let header : content = T.lines c
+        fields = T.splitOn "\t" header
+    return $ flip map content $ \l ->
+        HM.fromList $ zip fields $ T.splitOn "\t" l
+
 readATACSeq :: FilePath -> T.Text
             -> IO [ATACSeq N [MaybePairSomeFile]]
 readATACSeq input key = readFromFile input key parseATACSeq
 
+readATACSeqTSV :: FilePath -> T.Text -> IO [ATACSeq N [MaybePairSomeFile]]
+readATACSeqTSV input key = do
+    tsv <- readTSV input
+    return $ merge $ map (ATACSeq . mapToCommonFields) $
+        filter ((==key) . HM.lookupDefault "" "type") tsv
+
 readRNASeq :: FilePath -> T.Text
             -> IO [RNASeq N [MaybePairSomeFile]]
 readRNASeq input key = readFromFile input key parseRNASeq
+
+readRNASeqTSV :: FilePath -> T.Text -> IO [RNASeq N [MaybePairSomeFile]]
+readRNASeqTSV input key = do
+    tsv <- readTSV input
+    return $ merge $ map (RNASeq . mapToCommonFields) $
+        filter ((==key) . HM.lookupDefault "" "type") tsv
 
 readHiC :: FilePath -> T.Text
         -> IO [HiC N [MaybePairSomeFile]]
@@ -142,6 +153,37 @@ parseATACSeq :: Value -> Parser (ATACSeq N [MaybePairSomeFile])
 parseATACSeq = withObject "ATACSeq" $ \obj' -> do
     let obj = toLowerKey obj'
     ATACSeq <$> parseCommonFields (Object obj)
+
+mapToCommonFields :: HM.HashMap T.Text T.Text -> CommonFields S MaybePairSomeFile
+mapToCommonFields m = CommonFields
+    { _commonEid = HM.lookupDefault (error "missing id!") "id" m
+    , _commonGroupName = HM.lookup "group" m
+    , _commonSampleName = HM.lookupDefault "" "celltype" m
+    , _commonReplicates = Identity rep }
+  where
+    rep = Replicate
+        { replicateFiles = fl
+        , _replicateInfo = M.empty
+        , _replicateNumber = read $ T.unpack $ HM.lookupDefault "0" "rep" m
+        }
+    filetype f = case HM.lookup "format" m of
+        Nothing -> guessFormat f
+        Just x -> read $ T.unpack x
+    tags = case HM.lookup "tags" m of
+        Nothing -> []
+        Just x  -> map (read . T.unpack) $ T.splitOn "," x
+    locations = map T.unpack $ T.splitOn "," $
+        HM.lookupDefault (error "missing path") "path" m
+    fl = case locations of
+        [f] -> Left $ setFiletype (filetype f) $ addTags tags $ SomeFile
+            (File { fileLocation = f, fileInfo = M.empty } :: File '[] 'Other)
+        [f1,f2] -> Right
+            ( setFiletype (filetype f1) $ addTags tags $ SomeFile
+                (File { fileLocation = f1, fileInfo = M.empty } :: File '[] 'Other)
+            , setFiletype (filetype f2) $ addTags tags $ SomeFile
+                (File { fileLocation = f2, fileInfo = M.empty } :: File '[] 'Other)
+            )
+        _ -> error "too many files"
 
 parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
 parseRNASeq = withObject "RNASeq" $ \obj' -> do
