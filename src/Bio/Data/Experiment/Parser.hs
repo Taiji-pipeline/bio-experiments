@@ -27,6 +27,7 @@ module Bio.Data.Experiment.Parser
     , readRNASeq
     , readRNASeqTSV
     , readHiC
+    , readHiCTSV
     , parseRNASeq
     , guessFormat
     ) where
@@ -148,6 +149,12 @@ readRNASeqTSV input key = do
 readHiC :: FilePath -> T.Text
         -> IO [HiC N [MaybePairSomeFile]]
 readHiC input key = readFromFile input key parseHiC
+
+readHiCTSV :: FilePath -> T.Text -> IO [RNASeq N [MaybePairSomeFile]]
+readHiCTSV input key = do
+    tsv <- readTSV input
+    return $ merge $ map (HiC . mapToCommonFields) $
+        filter ((==key) . HM.lookupDefault "" "type") tsv
 
 parseATACSeq :: Value -> Parser (ATACSeq N [MaybePairSomeFile])
 parseATACSeq = withObject "ATACSeq" $ \obj' -> do
