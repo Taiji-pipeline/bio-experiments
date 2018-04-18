@@ -60,7 +60,7 @@ instance Serialize FileType
 -- | Tags of files
 $(singletons [d|
     data FileTag = Sorted
-                 | Pairend
+                 | PairedEnd
                  | Gzip
                  | GeneQuant
                  | TranscriptQuant
