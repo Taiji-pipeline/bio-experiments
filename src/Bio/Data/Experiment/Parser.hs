@@ -24,6 +24,8 @@
 module Bio.Data.Experiment.Parser
     ( readATACSeq
     , readATACSeqTSV
+    , readChIPSeq
+    , readChIPSeqTSV
     , readRNASeq
     , readRNASeqTSV
     , readHiC
@@ -126,15 +128,50 @@ readTSV input = do
     return $ flip map content $ \l ->
         HM.fromList $ zip fields $ T.splitOn "\t" l
 
+
+--------------------------------------------------------------------------------
+-- ATACSeq
+--------------------------------------------------------------------------------
+
 readATACSeq :: FilePath -> T.Text
             -> IO [ATACSeq N [MaybePairSomeFile]]
 readATACSeq input key = readFromFile input key parseATACSeq
+
+parseATACSeq :: Value -> Parser (ATACSeq N [MaybePairSomeFile])
+parseATACSeq = withObject "ATACSeq" $ \obj' -> do
+    let obj = toLowerKey obj'
+    ATACSeq <$> parseCommonFields (Object obj)
 
 readATACSeqTSV :: FilePath -> T.Text -> IO [ATACSeq N [MaybePairSomeFile]]
 readATACSeqTSV input key = do
     tsv <- readTSV input
     return $ merge $ map (ATACSeq . mapToCommonFields) $
         filter ((==key) . HM.lookupDefault "" "type") tsv
+
+
+--------------------------------------------------------------------------------
+-- ChIPSeq
+--------------------------------------------------------------------------------
+
+readChIPSeq :: FilePath -> T.Text
+            -> IO [ChIPSeq N [MaybePairSomeFile]]
+readChIPSeq input key = readFromFile input key parseChIPSeq
+
+parseChIPSeq :: Value -> Parser (ChIPSeq N [MaybePairSomeFile])
+parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
+    let obj = toLowerKey obj'
+    ChIPSeq <$> parseCommonFields (Object obj)
+
+readChIPSeqTSV :: FilePath -> T.Text -> IO [ChIPSeq N [MaybePairSomeFile]]
+readChIPSeqTSV input key = do
+    tsv <- readTSV input
+    return $ merge $ map (ChIPSeq . mapToCommonFields) $
+        filter ((==key) . HM.lookupDefault "" "type") tsv
+
+
+--------------------------------------------------------------------------------
+-- RNASeq
+--------------------------------------------------------------------------------
 
 readRNASeq :: FilePath -> T.Text
             -> IO [RNASeq N [MaybePairSomeFile]]
@@ -146,6 +183,14 @@ readRNASeqTSV input key = do
     return $ merge $ map (RNASeq . mapToCommonFields) $
         filter ((==key) . HM.lookupDefault "" "type") tsv
 
+parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
+parseRNASeq = withObject "RNASeq" $ \obj' -> do
+    let obj = toLowerKey obj'
+    RNASeq <$> parseCommonFields (Object obj)
+
+--------------------------------------------------------------------------------
+-- HiC
+--------------------------------------------------------------------------------
 readHiC :: FilePath -> T.Text
         -> IO [HiC N [MaybePairSomeFile]]
 readHiC input key = readFromFile input key parseHiC
@@ -156,11 +201,13 @@ readHiCTSV input key = do
     return $ merge $ map (HiC . mapToCommonFields) $
         filter ((==key) . HM.lookupDefault "" "type") tsv
 
-parseATACSeq :: Value -> Parser (ATACSeq N [MaybePairSomeFile])
-parseATACSeq = withObject "ATACSeq" $ \obj' -> do
+parseHiC :: Value -> Parser (HiC N [MaybePairSomeFile])
+parseHiC = withObject "HiC" $ \obj' -> do
     let obj = toLowerKey obj'
-    ATACSeq <$> parseCommonFields (Object obj)
+    HiC <$> parseCommonFields (Object obj)
 
+
+-- | Convert a dictionary to record
 mapToCommonFields :: HM.HashMap T.Text T.Text -> CommonFields S MaybePairSomeFile
 mapToCommonFields m = CommonFields
     { _commonEid = HM.lookupDefault (error "missing id!") "id" m
@@ -191,16 +238,6 @@ mapToCommonFields m = CommonFields
                 (File { fileLocation = f2, fileInfo = M.empty } :: File '[] 'Other)
             )
         _ -> error "too many files"
-
-parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
-parseRNASeq = withObject "RNASeq" $ \obj' -> do
-    let obj = toLowerKey obj'
-    RNASeq <$> parseCommonFields (Object obj)
-
-parseHiC :: Value -> Parser (HiC N [MaybePairSomeFile])
-parseHiC = withObject "HiC" $ \obj' -> do
-    let obj = toLowerKey obj'
-    HiC <$> parseCommonFields (Object obj)
 
 readFromFile :: FilePath
              -> T.Text   -- ^ key

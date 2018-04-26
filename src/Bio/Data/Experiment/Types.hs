@@ -95,6 +95,21 @@ instance Serialize (CommonFields container file) => Serialize (ATACSeq container
 instance Experiment ATACSeq where
     commonFields f e = (\x -> e{atacseqCommon = x}) <$> f (atacseqCommon e)
 
+-- | ChIP-seq
+data ChIPSeq container file = ChIPSeq
+    { chipseqCommon    :: CommonFields container file
+    } deriving (Generic)
+
+instance FromJSON (CommonFields container file)
+    => FromJSON (ChIPSeq container file)
+
+instance ToJSON (CommonFields container file)
+    => ToJSON (ChIPSeq container file)
+
+instance Serialize (CommonFields container file) => Serialize (ChIPSeq container file)
+
+instance Experiment ChIPSeq where
+    commonFields f e = (\x -> e{ chipseqCommon = x }) <$> f (chipseqCommon e)
 
 -- | RNA-seq
 data RNASeq container file = RNASeq
