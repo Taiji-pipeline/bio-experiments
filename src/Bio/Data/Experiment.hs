@@ -34,6 +34,7 @@ module Bio.Data.Experiment
     , N
 
     , ATACSeq
+    , ChIPSeq
     , RNASeq
     , HiC
 
