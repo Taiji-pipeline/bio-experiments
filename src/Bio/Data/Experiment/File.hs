@@ -59,7 +59,8 @@ instance Serialize FileType
 
 -- | Tags of files
 $(singletons [d|
-    data FileTag = Sorted
+    data FileTag = CoordinateSorted
+                 | NameSorted
                  | PairedEnd
                  | Gzip
                  | GeneQuant
