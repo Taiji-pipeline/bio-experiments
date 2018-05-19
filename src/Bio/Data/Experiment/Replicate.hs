@@ -19,7 +19,6 @@ import Bio.Data.Experiment.File
 data Replicate file = Replicate
     { replicateFiles   :: file
     , _replicateInfo   :: (Map T.Text T.Text)
-    , _replicateNumber :: Int
     }
     deriving (Generic)
 

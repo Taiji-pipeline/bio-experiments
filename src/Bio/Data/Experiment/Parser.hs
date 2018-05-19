@@ -39,8 +39,8 @@ import           Data.Aeson
 import           Data.Aeson.Internal           (JSONPathElement (..), (<?>))
 import           Data.Aeson.Types
 import           Data.CaseInsensitive          (CI, mk)
-import           Data.Functor.Identity         (Identity (..))
 import qualified Data.HashMap.Strict           as HM
+import qualified Data.IntMap.Strict            as IM
 import           Data.List                     (nub)
 import qualified Data.Map.Strict               as M
 import qualified Data.Text                     as T
@@ -48,10 +48,10 @@ import qualified Data.Text.IO                  as T
 import qualified Data.Vector                   as V
 import           Data.Yaml
 
+import           Bio.Data.Experiment
 import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Replicate
 import           Bio.Data.Experiment.Types
-import           Bio.Data.Experiment
 
 type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
 
@@ -94,12 +94,13 @@ gzipped :: FilePath -> Bool
 gzipped fl = ".gz" `T.isSuffixOf` T.pack fl
 
 parseReplicate :: Value
-               -> Parser (Replicate [MaybePairSomeFile])
+               -> Parser (S (Replicate [MaybePairSomeFile]))
 parseReplicate = withObject "Replicate" $ \obj' -> do
     let obj = toLowerKey obj'
-    Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
-                  obj .:? "info" .!= M.empty <*>
-                  obj .:? "rep" .!= 0
+    repNum <- obj .:? "rep" .!= 0
+    rep <- Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
+        obj .:? "info" .!= M.empty
+    return (repNum, rep)
 
 parseCommonFields :: Value
                   -> Parser (CommonFields N [MaybePairSomeFile])
@@ -108,7 +109,10 @@ parseCommonFields = withObject "CommonFields" $ \obj' -> do
     CommonFields <$> obj .: "id" <*>
                      obj .:? "group" <*>
                      obj .:? "celltype" .!= "" <*>
-                     withParser (parseList parseReplicate) obj "replicates"
+                     (IM.fromListWith errMsg <$>
+                        withParser (parseList parseReplicate) obj "replicates")
+  where
+    errMsg = error "Different replicates should have unique replicate numbers"
 
                      {-
 parseChIPSeq :: Value -> Parser (ChIPSeq [SomeFile])
@@ -145,7 +149,7 @@ parseATACSeq = withObject "ATACSeq" $ \obj' -> do
 readATACSeqTSV :: FilePath -> T.Text -> IO [ATACSeq N [MaybePairSomeFile]]
 readATACSeqTSV input key = do
     tsv <- readTSV input
-    return $ merge $ map (ATACSeq . mapToCommonFields) $
+    return $ mergeExp $ map (ATACSeq . mapToCommonFields) $
         filter ((==key) . HM.lookupDefault "" "type") tsv
 
 
@@ -165,7 +169,7 @@ parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
 readChIPSeqTSV :: FilePath -> T.Text -> IO [ChIPSeq N [MaybePairSomeFile]]
 readChIPSeqTSV input key = do
     tsv <- readTSV input
-    return $ merge $ map (ChIPSeq . mapToCommonFields) $
+    return $ mergeExp $ map (ChIPSeq . mapToCommonFields) $
         filter ((==key) . HM.lookupDefault "" "type") tsv
 
 
@@ -180,7 +184,7 @@ readRNASeq input key = readFromFile input key parseRNASeq
 readRNASeqTSV :: FilePath -> T.Text -> IO [RNASeq N [MaybePairSomeFile]]
 readRNASeqTSV input key = do
     tsv <- readTSV input
-    return $ merge $ map (RNASeq . mapToCommonFields) $
+    return $ mergeExp $ map (RNASeq . mapToCommonFields) $
         filter ((==key) . HM.lookupDefault "" "type") tsv
 
 parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
@@ -198,7 +202,7 @@ readHiC input key = readFromFile input key parseHiC
 readHiCTSV :: FilePath -> T.Text -> IO [HiC N [MaybePairSomeFile]]
 readHiCTSV input key = do
     tsv <- readTSV input
-    return $ merge $ map (HiC . mapToCommonFields) $
+    return $ mergeExp $ map (HiC . mapToCommonFields) $
         filter ((==key) . HM.lookupDefault "" "type") tsv
 
 parseHiC :: Value -> Parser (HiC N [MaybePairSomeFile])
@@ -213,16 +217,16 @@ mapToCommonFields m = CommonFields
     { _commonEid = HM.lookupDefault (error "missing id!") "id" m
     , _commonGroupName = HM.lookup "group" m
     , _commonSampleName = HM.lookupDefault "" "celltype" m
-    , _commonReplicates = Identity rep }
+    , _commonReplicates = (repNum, rep) }
   where
+    repNum = read $ T.unpack $ HM.lookupDefault "0" "rep" m
     rep = Replicate
         { replicateFiles = fl
         , _replicateInfo = M.empty
-        , _replicateNumber = read $ T.unpack $ HM.lookupDefault "0" "rep" m
         }
     filetype f = case HM.lookup "format" m of
         Nothing -> guessFormat f
-        Just x -> read $ T.unpack x
+        Just x  -> read $ T.unpack x
     tags = case HM.lookup "tags" m of
         Nothing -> []
         Just x  -> map (read . T.unpack) $ T.splitOn "," x

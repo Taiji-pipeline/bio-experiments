@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
@@ -28,7 +29,6 @@ module Bio.Data.Experiment
     , Replicate(..)
     , files
     , info
-    , number
     , Experiment(..)
     , S
     , N
@@ -41,15 +41,16 @@ module Bio.Data.Experiment
     , AllC
     , Insert'
     , Splitter(..)
-    , Merger(..)
+    , mergeExp
     , zipExp
     ) where
 
+import           Control.Arrow                 (second)
 import           Control.Lens
 import           Data.Function                 (on)
+import qualified Data.IntMap.Strict            as IM
 import           Data.List                     (groupBy, sortBy)
 import qualified Data.Map.Strict               as M
-import           Data.Maybe                    (mapMaybe)
 import           Data.Monoid                   ((<>))
 import           Data.Ord                      (comparing)
 import           Data.Promotion.Prelude.List   (Elem, Insert)
@@ -80,60 +81,50 @@ instance Splitter (Replicate [f]) (Replicate f) where
     {-# INLINE split #-}
 
 instance Experiment e => Splitter (e N f) (e S f) where
-    split e = zipWith (\x y -> replicates .~ return x $ y)
-        (e^.replicates) $ repeat e
+    split e = zipWith (\x y -> replicates .~ x $ y)
+        (IM.toList $ e^.replicates) $ repeat e
     {-# INLINE split #-}
 
 instance Experiment e => Splitter (e S [f]) (e S f) where
-    split e = zipWith (\x y -> replicates .~ return x $ y)
-        (split $ runIdentity $ e^.replicates) $ repeat e
-    {-# INLINE split #-}
-
-instance Experiment e => Splitter (e S (Either f1 f2)) (Either (e S f1) (e S f2)) where
-    split e = case runIdentity (e^.replicates) ^. files of
-        Left fl  -> [Left $ replicates.mapped.files .~ fl $ e]
-        Right fl -> [Right $ replicates.mapped.files .~ fl $ e]
-    {-# INLINE split #-}
-
-class Merger a b | a -> b where
-    merge :: [a] -> [b]
-
-instance Merger (Replicate f) (Replicate [f]) where
-    merge rs = map combineRep repGroup
+    split e = zipWith (\x y -> replicates .~ x $ y) reps $ repeat e
       where
-        repGroup = groupBy ((==) `on` (^.number)) $ sortBy (comparing (^.number)) rs
-        combineRep reps = files .~ map (^.files) reps $ info .~ infos $ head reps
+        reps = let (i, x) = e^.replicates
+               in zip (repeat i) $ split x
+    {-# INLINE split #-}
+
+mergeExp :: Experiment e => [e S f] -> [e N [f]]
+mergeExp = map combineExp . groupBy ((==) `on` (^.eid)) .
+    sortBy (comparing (^.eid))
+  where
+    combineExp expGrp =
+        if allEqual (map (\x -> (x^.groupName, x^.sampleName)) expGrp)
+            then replicates .~ mergeReplicates
+                (map (^.replicates) expGrp) $ head expGrp
+            else error "Abort: Found experiments with same id but with different contents"
+    allEqual (x:xs) = all (==x) xs
+    allEqual _      = True
+
+mergeReplicates :: [S (Replicate f)] -> N (Replicate [f])
+mergeReplicates = IM.fromListWith f . map (second (\x -> files %~ return $ x))
+      where
+        f r1 r2 = files .~ fls $ info .~ infos $ r1
           where
-            infos = M.fromListWith f $ concatMap (M.toList . (^.info)) reps
-            f a b | a == b = a
+            fls = r1^.files ++ r2^.files
+            infos = M.unionWith g (r1^.info) $ r2^.info
+            g a b | a == b = a
                   | otherwise = a <> " | " <> b
-    {-# INLINE merge #-}
-
-instance Experiment e => Merger (e S f) (e N [f]) where
-    merge = map combineExp . groupBy ((==) `on` (^.eid)) .
-        sortBy (comparing (^.eid))
-      where
-        combineExp expGrp =
-            if allEqual (map (\x -> (x^.groupName, x^.sampleName)) expGrp)
-                then replicates .~ merge
-                    (map (runIdentity . (^.replicates)) expGrp) $ head expGrp
-                else error "Abort: Found experiments with same id but with different contents"
-        allEqual (x:xs) = all (==x) xs
-        allEqual _      = True
-    {-# INLINE merge #-}
+{-# INLINE mergeReplicates #-}
 
 zipExp :: Experiment e
        => [e S file1]
        -> [e S file2]
        -> [e S (file1, file2)]
-zipExp xs ys = flip mapMaybe xs $ \x ->
-    let k = (x^.eid, runIdentity (x^.replicates) ^. number)
-    in zip' x <$> M.lookup k ys'
+zipExp xs ys = M.elems $ M.intersectionWith f xs' ys'
   where
-    ys' = M.fromListWithKey raiseErr $ map (\x ->
-        ( (x^.eid, runIdentity (x^.replicates) ^. number)
-        , runIdentity (x^.replicates) ^. files )
-        ) ys
+    f x y = x & replicates._2.files %~ (\f1 -> (f1, y^.replicates._2.files))
+    xs' = M.fromListWithKey raiseErr $
+        map ( \x -> ((x^.eid, x^.replicates._1), x) ) xs
+    ys' = M.fromListWithKey raiseErr $
+        map ( \x -> ((x^.eid, x^.replicates._1), x) ) ys
     raiseErr k _ _ = error $ "Duplicate records: " ++ show k
-    zip' e x = e & replicates.mapped.files %~ (\f -> (f, x))
 {-# INLINE zipExp #-}

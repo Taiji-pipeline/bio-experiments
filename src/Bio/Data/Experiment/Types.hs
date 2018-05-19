@@ -14,7 +14,7 @@ module Bio.Data.Experiment.Types where
 
 import           Control.Lens                  (Lens, Lens', makeLenses)
 import           Data.Aeson
-import           Data.Functor.Identity
+import qualified Data.IntMap.Strict            as IM
 import           Data.Serialize                (Serialize (..))
 import           Data.Serialize.Text           ()
 import qualified Data.Text                     as T
@@ -22,12 +22,8 @@ import           GHC.Generics                  (Generic)
 
 import           Bio.Data.Experiment.Replicate
 
-type S = Identity
-type N = []
-
-instance Serialize a => Serialize (Identity a) where
-    put (Identity x) = put x
-    get = Identity <$> get
+type S = (,) Int
+type N = IM.IntMap
 
 -- | A set of fields that exist in all kinds of Assays
 data CommonFields container file = CommonFields
@@ -52,7 +48,7 @@ defaultCommonFields = CommonFields
     { _commonEid = ""
     , _commonGroupName = Nothing
     , _commonSampleName = ""
-    , _commonReplicates = []
+    , _commonReplicates = IM.empty
     }
 
 class Experiment e where
