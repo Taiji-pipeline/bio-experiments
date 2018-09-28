@@ -227,18 +227,20 @@ mapToCommonFields m = CommonFields
     filetype f = case HM.lookup "format" m of
         Nothing -> guessFormat f
         Just x  -> read $ T.unpack x
-    tags = case HM.lookup "tags" m of
+    tags f = checkGzipped f $ case HM.lookup "tags" m of
         Nothing -> []
         Just x  -> map (read . T.unpack) $ T.splitOn "," x
+      where
+        checkGzipped x ts = nub $ if gzipped x then Gzip : ts else ts
     locations = map T.unpack $ T.splitOn "," $
         HM.lookupDefault (error "missing path") "path" m
     fl = case locations of
-        [f] -> Left $ setFiletype (filetype f) $ addTags tags $ SomeFile
+        [f] -> Left $ setFiletype (filetype f) $ addTags (tags f) $ SomeFile
             (File { fileLocation = f, fileInfo = M.empty } :: File '[] 'Other)
         [f1,f2] -> Right
-            ( setFiletype (filetype f1) $ addTags tags $ SomeFile
+            ( setFiletype (filetype f1) $ addTags (tags f1) $ SomeFile
                 (File { fileLocation = f1, fileInfo = M.empty } :: File '[] 'Other)
-            , setFiletype (filetype f2) $ addTags tags $ SomeFile
+            , setFiletype (filetype f2) $ addTags (tags f2) $ SomeFile
                 (File { fileLocation = f2, fileInfo = M.empty } :: File '[] 'Other)
             )
         _ -> error "too many files"
