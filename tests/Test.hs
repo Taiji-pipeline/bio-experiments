@@ -8,7 +8,7 @@ import qualified Data.Serialize as S
 import           Test.Tasty.HUnit
 import Data.Maybe
 import Data.Singletons
-import Data.Promotion.Prelude
+import Data.Singletons.Prelude
 import Data.Singletons.Prelude.List
 
 {-
@@ -37,11 +37,11 @@ testTypeFun = assertBool "type" $ and dat
   where
 
     dat = [ (Proxy :: Proxy (Elem 'Gzip '[Gzip])) == true
-          , (Proxy :: Proxy (Elem 'Gzip '[Gzip, Sorted])) == true
-          , (Proxy :: Proxy (Elem 'Gzip '[Sorted, Pairend])) == false
-          , (Proxy :: Proxy (Delete 'Gzip '[Gzip, Sorted])) ==
-            (Proxy :: Proxy '[Sorted])
-          , (Proxy :: Proxy (Elem 'Gzip (Insert 'Gzip '[Sorted]))) == true
+          , (Proxy :: Proxy (Elem 'Gzip '[Gzip, NameSorted])) == true
+          , (Proxy :: Proxy (Elem 'Gzip '[NameSorted, PairedEnd])) == false
+          , (Proxy :: Proxy (Delete 'Gzip '[Gzip, NameSorted])) ==
+            (Proxy :: Proxy '[NameSorted])
+          , (Proxy :: Proxy (Elem 'Gzip (Insert 'Gzip '[NameSorted]))) == true
           ]
     true = Proxy :: Proxy 'True
     false = Proxy :: Proxy 'False

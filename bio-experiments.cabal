@@ -1,5 +1,5 @@
 name:                bio-experiments
-version:             0.1.0
+version:             0.2.0
 -- synopsis:
 -- description:
 homepage:            NONE
@@ -7,7 +7,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Kai Zhang
 maintainer:          kai@kzhang.org
-copyright:           (c) 2017 Kai Zhang
+copyright:           (c) 2017-2019 Kai Zhang
 category:            Bio
 build-type:          Simple
 extra-source-files:  README.md
@@ -21,7 +21,7 @@ library
                        Bio.Data.Experiment.File
                        Bio.Data.Experiment.Replicate
                        Bio.Data.Experiment.Parser
-  build-depends:       base >= 4.7 && < 5
+  build-depends:       base == 4.*
                      , aeson
                      , cereal
                      , cereal-text
@@ -29,7 +29,7 @@ library
                      , containers
                      , lens
                      , text
-                     , singletons
+                     , singletons >= 2.5
                      , unordered-containers
                      , yaml
                      , vector

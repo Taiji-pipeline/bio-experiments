@@ -26,7 +26,6 @@ import           Data.Aeson.TH           (defaultOptions, deriveJSON)
 import           Data.Coerce             (coerce)
 import           Data.List               (foldl')
 import qualified Data.Map.Strict         as M
-import           Data.Promotion.Prelude
 import           Data.Serialize          (Serialize (..))
 import           Data.Serialize.Text     ()
 import           Data.Singletons.Prelude

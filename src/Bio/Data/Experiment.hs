@@ -53,7 +53,7 @@ import           Data.List                     (groupBy, sortBy)
 import qualified Data.Map.Strict               as M
 import           Data.Monoid                   ((<>))
 import           Data.Ord                      (comparing)
-import           Data.Promotion.Prelude.List   (Elem, Insert)
+import           Data.Singletons.Prelude.List   (Elem, Insert)
 import           Data.Singletons.Prelude.Bool  (If)
 import           GHC.Exts                      (Constraint)
 
