@@ -226,9 +226,11 @@ mapToCommonFields m = CommonFields
         }
     filetype f = case HM.lookup "format" m of
         Nothing -> guessFormat f
+        Just "" -> guessFormat f
         Just x  -> read $ T.unpack x
     tags f = checkGzipped f $ case HM.lookup "tags" m of
         Nothing -> []
+        Just "" -> []
         Just x  -> map (read . T.unpack) $ T.splitOn "," x
       where
         checkGzipped x ts = nub $ if gzipped x then Gzip : ts else ts
