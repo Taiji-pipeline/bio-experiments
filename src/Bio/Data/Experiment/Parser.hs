@@ -150,7 +150,7 @@ readATACSeqTSV :: FilePath -> T.Text -> IO [ATACSeq N [MaybePairSomeFile]]
 readATACSeqTSV input key = do
     tsv <- readTSV input
     return $ mergeExp $ map (ATACSeq . mapToCommonFields) $
-        filter ((==key) . HM.lookupDefault "" "type") tsv
+        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
 
 
 --------------------------------------------------------------------------------
@@ -170,7 +170,7 @@ readChIPSeqTSV :: FilePath -> T.Text -> IO [ChIPSeq N [MaybePairSomeFile]]
 readChIPSeqTSV input key = do
     tsv <- readTSV input
     return $ mergeExp $ map (ChIPSeq . mapToCommonFields) $
-        filter ((==key) . HM.lookupDefault "" "type") tsv
+        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
 
 
 --------------------------------------------------------------------------------
@@ -185,7 +185,7 @@ readRNASeqTSV :: FilePath -> T.Text -> IO [RNASeq N [MaybePairSomeFile]]
 readRNASeqTSV input key = do
     tsv <- readTSV input
     return $ mergeExp $ map (RNASeq . mapToCommonFields) $
-        filter ((==key) . HM.lookupDefault "" "type") tsv
+        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
 
 parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
 parseRNASeq = withObject "RNASeq" $ \obj' -> do
@@ -203,7 +203,7 @@ readHiCTSV :: FilePath -> T.Text -> IO [HiC N [MaybePairSomeFile]]
 readHiCTSV input key = do
     tsv <- readTSV input
     return $ mergeExp $ map (HiC . mapToCommonFields) $
-        filter ((==key) . HM.lookupDefault "" "type") tsv
+        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
 
 parseHiC :: Value -> Parser (HiC N [MaybePairSomeFile])
 parseHiC = withObject "HiC" $ \obj' -> do
