@@ -84,7 +84,9 @@ guessFormat fl = case () of
       | ".bed" `T.isSuffixOf` fl' -> Bed
       | ".bed.gz" `T.isSuffixOf` fl' -> Bed
       | ".fastq" `T.isSuffixOf` fl' -> Fastq
+      | ".fq" `T.isSuffixOf` fl' -> Fastq
       | ".fastq.gz" `T.isSuffixOf` fl' -> Fastq
+      | ".fq.gz" `T.isSuffixOf` fl' -> Fastq
       | ".bw" `T.isSuffixOf` fl' -> BigWig
       | otherwise -> Other
   where
