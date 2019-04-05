@@ -29,9 +29,13 @@ module Bio.Data.Experiment
     , Replicate(..)
     , files
     , info
-    , Experiment(..)
+    , Experiment
     , S
     , N
+    , eid
+    , groupName
+    , sampleName
+    , replicates
 
     , ATACSeq
     , ChIPSeq

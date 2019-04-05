@@ -50,7 +50,6 @@ import           Data.Yaml
 
 import           Bio.Data.Experiment
 import           Bio.Data.Experiment.File
-import           Bio.Data.Experiment.Replicate
 import           Bio.Data.Experiment.Types
 
 type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
