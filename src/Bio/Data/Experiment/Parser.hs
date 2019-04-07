@@ -16,6 +16,7 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE Rank2Types            #-}
@@ -32,9 +33,11 @@ module Bio.Data.Experiment.Parser
     , readHiCTSV
     , parseRNASeq
     , guessFormat
+    , simpleInputReader
     ) where
 
 import           Control.Arrow                 (first)
+import Control.Exception
 import           Data.Aeson
 import           Data.Aeson.Internal           (JSONPathElement (..), (<?>))
 import           Data.Aeson.Types
@@ -132,6 +135,26 @@ readTSV input = do
         fields = T.splitOn "\t" header
     return $ flip map content $ \l ->
         HM.fromList $ zip fields $ T.splitOn "\t" l
+
+simpleInputReader :: Experiment e
+                  => FilePath  -- ^ Input file
+                  -> T.Text    -- key
+                  -> (CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
+                  -> IO [e N [MaybePairSomeFile]]
+simpleInputReader input key constructor = try simpleReadYAML >>= \case
+    Right res -> return res
+    Left (SomeException e) -> do
+        putStrLn "Parsing input file as YAML format failed because:"
+        print e
+        putStrLn "Now trying TSV format..."
+        simpleReadTSV
+  where
+    simpleReadTSV = do
+        tsv <- readTSV input
+        return $ map constructor $ mergeExp $ map mapToCommonFields $
+            filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
+    simpleReadYAML = readFromFile input key $ withObject "E" $ \obj' ->
+        constructor <$> parseCommonFields (Object $ toLowerKey obj')
 
 
 --------------------------------------------------------------------------------
