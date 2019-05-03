@@ -44,6 +44,7 @@ $(singletons [d|
                   | Fastq
                   | Bedgraph
                   | BigWig
+                  | BigBed
                   | NarrowPeak
                   | BroadPeak
                   | SRA
