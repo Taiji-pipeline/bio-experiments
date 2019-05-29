@@ -26,8 +26,7 @@ import           Data.Aeson.TH           (defaultOptions, deriveJSON)
 import           Data.Coerce             (coerce)
 import           Data.List               (foldl')
 import qualified Data.Map.Strict         as M
-import           Data.Serialize          (Serialize (..))
-import           Data.Serialize.Text     ()
+import           Data.Binary (Binary(..))
 import           Data.Singletons.Prelude
 import           Data.Singletons.TH
 import qualified Data.Text               as T
@@ -54,7 +53,7 @@ $(singletons [d|
     |])
 
 deriveJSON defaultOptions ''FileType
-instance Serialize FileType
+instance Binary FileType
 
 
 -- | Tags of files
@@ -72,7 +71,7 @@ $(singletons [d|
     |])
 
 deriveJSON defaultOptions ''FileTag
-instance Serialize FileTag
+instance Binary FileTag
 
 
 -- | File
@@ -84,14 +83,14 @@ data File (filetags :: [FileTag]) (filetype :: FileType) where
 
 makeFields ''File
 deriveJSON defaultOptions ''File
-instance Serialize (File filetags filetype)
+instance Binary (File filetags filetype)
 
 -- | Opaque File
 data SomeFile where
     SomeFile :: (SingI filetype, SingI filetags)
              => File filetags filetype -> SomeFile
 
-instance Serialize SomeFile where
+instance Binary SomeFile where
     put fl = case fl of
         SomeFile (fl' :: File filetag filetype) -> do
             put $ fromSing (sing :: Sing filetag)
@@ -129,7 +128,7 @@ data SomeTags filetype where
     SomeTags :: SingI filetags
              => File filetags filetype -> SomeTags filetype
 
-instance Serialize (SomeTags filetype) where
+instance Binary (SomeTags filetype) where
     put fl = case fl of
         SomeTags (fl' :: File filetag filetype) -> do
             put $ fromSing (sing :: Sing filetag)

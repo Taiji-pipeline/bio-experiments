@@ -9,8 +9,7 @@ module Bio.Data.Experiment.Replicate where
 import           Control.Lens             (Lens, makeFields)
 import           Data.Aeson.TH            (defaultOptions, deriveJSON)
 import           Data.Map.Strict          (Map)
-import           Data.Serialize           (Serialize (..))
-import           Data.Serialize.Text      ()
+import           Data.Binary (Binary(..))
 import qualified Data.Text                as T
 import           GHC.Generics             (Generic)
 
@@ -29,4 +28,4 @@ files f s = (\x -> s{replicateFiles = x}) <$> f (replicateFiles s)
 {-# INLINE files #-}
 
 deriveJSON defaultOptions ''Replicate
-instance Serialize file => Serialize (Replicate file)
+instance Binary file => Binary (Replicate file)

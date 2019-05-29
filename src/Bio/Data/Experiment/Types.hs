@@ -30,8 +30,7 @@ module Bio.Data.Experiment.Types
 import           Control.Lens                  (Lens, Lens', makeLenses)
 import           Data.Aeson
 import qualified Data.IntMap.Strict            as IM
-import           Data.Serialize                (Serialize (..))
-import           Data.Serialize.Text           ()
+import           Data.Binary (Binary(..))
 import qualified Data.Text                     as T
 import           GHC.Generics                  (Generic)
 
@@ -70,8 +69,8 @@ instance FromJSON (container (Replicate file)) =>
 instance ToJSON (container (Replicate file)) =>
     ToJSON (CommonFields container file)
 
-instance Serialize (container (Replicate file)) =>
-    Serialize (CommonFields container file)
+instance Binary (container (Replicate file)) =>
+    Binary (CommonFields container file)
 
 instance Experiment CommonFields where
     getFields = id
@@ -109,8 +108,8 @@ instance FromJSON (CommonFields container file) =>
 instance ToJSON (CommonFields container file) =>
     ToJSON (ATACSeq container file)
 
-instance Serialize (CommonFields container file) =>
-    Serialize (ATACSeq container file)
+instance Binary (CommonFields container file) =>
+    Binary (ATACSeq container file)
 
 -- | ChIP-seq
 newtype ChIPSeq container file = ChIPSeq
@@ -123,7 +122,7 @@ instance FromJSON (CommonFields container file)
 instance ToJSON (CommonFields container file)
     => ToJSON (ChIPSeq container file)
 
-instance Serialize (CommonFields container file) => Serialize (ChIPSeq container file)
+instance Binary (CommonFields container file) => Binary (ChIPSeq container file)
 
 -- | RNA-seq
 newtype RNASeq container file = RNASeq
@@ -136,7 +135,7 @@ instance FromJSON (CommonFields container file)
 instance ToJSON (CommonFields container file)
     => ToJSON (RNASeq container file)
 
-instance Serialize (CommonFields container file) => Serialize (RNASeq container file)
+instance Binary (CommonFields container file) => Binary (RNASeq container file)
 
 -- | HiC
 newtype HiC container file = HiC
@@ -149,4 +148,4 @@ instance FromJSON (CommonFields container file)
 instance ToJSON (CommonFields container file)
     => ToJSON (HiC container file)
 
-instance Serialize (CommonFields container file) => Serialize (HiC container file)
+instance Binary (CommonFields container file) => Binary (HiC container file)
