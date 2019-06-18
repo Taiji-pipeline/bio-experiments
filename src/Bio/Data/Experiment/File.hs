@@ -104,21 +104,12 @@ instance Binary SomeFile where
                 SomeSing (ft :: SFileType ft) -> withSingI tag $ withSingI ft $
                     SomeFile <$> (get :: _ (File tags ft))
 
-instance ToJSON SomeFile where
-    toJSON fl = case fl of
-        SomeFile (fl' :: File filetag filetype) -> object
-            [ "filetag" .= fromSing (sing :: Sing filetag)
-            , "filetype" .= fromSing (sing :: Sing filetype)
-            , "data" .= fl' ]
-
-instance FromJSON SomeFile where
-    parseJSON = withObject "SomeFile" $ \obj -> do
-        filetags <- obj .: "filetag" :: _ [FileTag]
-        filetype <- obj .: "filetype" :: _ FileType
-        case toSing filetags of
-            SomeSing (tag :: Sing tags) -> case toSing filetype of
-                SomeSing (ft :: SFileType ft) -> withSingI tag $ withSingI ft $
-                    SomeFile <$> (obj .: "data" :: _ (File tags ft))
+instance Show SomeFile where
+    show fl = case fl of
+        SomeFile (fl' :: File filetag filetype) -> show
+            ( fromSing (sing :: Sing filetag)
+            , fromSing (sing :: Sing filetype)
+            , fl' )
 
 fromSomeFile :: SomeFile -> File tag filetype
 fromSomeFile x = case x of
@@ -139,18 +130,11 @@ instance Binary (SomeTags filetype) where
             SomeSing (tag :: Sing tags) -> withSingI tag $
                 SomeTags <$> (get :: _ (File tags filetype))
 
-instance ToJSON (SomeTags filetype) where
-    toJSON fl = case fl of
-        SomeTags (fl' :: File filetag filetype) -> object
-            [ "filetag" .= fromSing (sing :: Sing filetag)
-            , "data" .= fl' ]
-
-instance FromJSON (SomeTags filetype) where
-    parseJSON = withObject "SomeFile" $ \obj -> do
-        filetags <- obj .: "filetag" :: _ [FileTag]
-        case toSing filetags of
-            SomeSing (tag :: Sing tags) -> withSingI tag $
-                SomeTags <$> (obj .: "data" :: _ (File tags filetype))
+instance Show (SomeTags filetype) where
+    show fl = case fl of
+        SomeTags (fl' :: File filetag filetype) -> show
+            ( fromSing (sing :: Sing filetag)
+            , fl' )
 
 fromSomeTags :: SomeTags filetype -> File tag filetype
 fromSomeTags x = case x of

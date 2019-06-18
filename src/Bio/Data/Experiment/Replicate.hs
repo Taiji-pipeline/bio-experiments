@@ -19,7 +19,7 @@ data Replicate file = Replicate
     { replicateFiles   :: file
     , _replicateInfo   :: (Map T.Text T.Text)
     }
-    deriving (Generic)
+    deriving (Show, Generic)
 
 makeFields ''Replicate
 
