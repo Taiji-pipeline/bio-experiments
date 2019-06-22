@@ -18,10 +18,7 @@
 
 module Bio.Data.Experiment.File where
 
-import           Control.Lens            (makeFields)
-import           Data.Aeson              (FromJSON (..), ToJSON (..),
-                                          Value (..), object, withArray,
-                                          withObject, (.:), (.=))
+import           Lens.Micro.TH (makeFields)
 import           Data.Aeson.TH           (defaultOptions, deriveJSON)
 import           Data.Coerce             (coerce)
 import           Data.List               (foldl')
@@ -30,10 +27,7 @@ import           Data.Binary (Binary(..))
 import           Data.Singletons.Prelude
 import           Data.Singletons.TH
 import qualified Data.Text               as T
-import           Data.Type.Bool
-import qualified Data.Vector             as V
 import           GHC.Generics            (Generic)
-import           GHC.TypeLits
 
 -- | Formats of files
 $(singletons [d|

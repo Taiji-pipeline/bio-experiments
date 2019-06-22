@@ -50,7 +50,7 @@ module Bio.Data.Experiment
     ) where
 
 import           Control.Arrow                 (second)
-import           Control.Lens
+import           Lens.Micro
 import           Data.Function                 (on)
 import qualified Data.IntMap.Strict            as IM
 import           Data.List                     (groupBy, sortBy)

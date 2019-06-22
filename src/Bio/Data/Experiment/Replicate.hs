@@ -6,7 +6,8 @@
 {-# LANGUAGE TemplateHaskell        #-}
 module Bio.Data.Experiment.Replicate where
 
-import           Control.Lens             (Lens, makeFields)
+import           Lens.Micro.TH (makeFields)
+import           Lens.Micro (Lens)
 import           Data.Aeson.TH            (defaultOptions, deriveJSON)
 import           Data.Map.Strict          (Map)
 import           Data.Binary (Binary(..))

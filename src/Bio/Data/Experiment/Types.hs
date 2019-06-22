@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Bio.Data.Experiment.Types
     ( S
@@ -27,7 +28,8 @@ module Bio.Data.Experiment.Types
     , HiC(..)
     ) where
 
-import           Control.Lens                  (Lens, Lens', makeLenses)
+import           Lens.Micro.TH (makeLenses)
+import           Lens.Micro (Lens, Lens')
 import qualified Data.IntMap.Strict            as IM
 import           Data.Binary (Binary(..))
 import qualified Data.Text                     as T
@@ -61,7 +63,7 @@ defaultCommonFields = CommonFields
 
 makeLenses ''CommonFields
 
-instance Show (container (Replicate file)) =>
+deriving instance Show (container (Replicate file)) =>
     Show (CommonFields container file)
 
 instance Binary (container (Replicate file)) =>
@@ -97,7 +99,7 @@ newtype ATACSeq container file = ATACSeq
     { atacseqCommon    :: CommonFields container file
     } deriving (Generic, Experiment)
 
-instance Show (CommonFields container file) =>
+deriving instance Show (CommonFields container file) =>
     Show (ATACSeq container file)
 
 instance Binary (CommonFields container file) =>
@@ -108,7 +110,7 @@ newtype ChIPSeq container file = ChIPSeq
     { chipseqCommon    :: CommonFields container file
     } deriving (Generic, Experiment)
 
-instance Show (CommonFields container file)
+deriving instance Show (CommonFields container file)
     => Show (ChIPSeq container file)
 
 instance Binary (CommonFields container file) => Binary (ChIPSeq container file)
@@ -118,7 +120,7 @@ newtype RNASeq container file = RNASeq
     { rnaseqCommon    :: CommonFields container file
     } deriving (Generic, Experiment)
 
-instance Show (CommonFields container file)
+deriving instance Show (CommonFields container file)
     => Show (RNASeq container file)
 
 instance Binary (CommonFields container file) => Binary (RNASeq container file)
@@ -128,7 +130,7 @@ newtype HiC container file = HiC
     { hicCommon    :: CommonFields container file
     } deriving (Generic, Experiment)
 
-instance Show (CommonFields container file)
+deriving instance Show (CommonFields container file)
     => Show (HiC container file)
 
 instance Binary (CommonFields container file) => Binary (HiC container file)

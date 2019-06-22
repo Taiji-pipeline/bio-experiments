@@ -26,7 +26,8 @@ library
                      , aeson
                      , case-insensitive
                      , containers
-                     , lens
+                     , microlens
+                     , microlens-th
                      , text
                      , singletons >= 2.5
                      , unordered-containers
