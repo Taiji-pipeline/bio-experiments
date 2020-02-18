@@ -23,17 +23,8 @@
 {-# LANGUAGE TypeOperators         #-}
 
 module Bio.Data.Experiment.Parser
-    ( readATACSeq
-    , readATACSeqTSV
-    , readChIPSeq
-    , readChIPSeqTSV
-    , readRNASeq
-    , readRNASeqTSV
-    , readHiC
-    , readHiCTSV
-    , parseRNASeq
+    ( mkInputReader
     , guessFormat
-    , simpleInputReader
     ) where
 
 import           Control.Arrow                 (first)
@@ -44,89 +35,63 @@ import           Data.Aeson.Types
 import           Data.CaseInsensitive          (CI, mk)
 import qualified Data.HashMap.Strict           as HM
 import qualified Data.IntMap.Strict            as IM
-import           Data.List                     (nub)
+import           Data.List                     (nub, groupBy, sortBy)
 import qualified Data.Map.Strict               as M
+import Data.Function (on)
+import Data.Ord (comparing)
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import qualified Data.Vector                   as V
 import           Data.Yaml
+import Control.Monad (unless)
 
 import           Bio.Data.Experiment
 import           Bio.Data.Experiment.File
 import           Bio.Data.Experiment.Types
 
-type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
-
-parseFile :: Value -> Parser SomeFile
-parseFile = withObject "File" $ \obj' -> do
-    let obj = toLowerKey obj'
-    path <- obj .: "path"
-    format <- obj .:? "format" .!= guessFormat path
-    tags <- fmap (\x -> nub $ if gzipped path then Gzip : x else x) $
-        obj .:? "tags" .!= []
-    fl <- File <$> return path <*> obj .:? "info" .!= M.empty
-    return $ addTags tags $ setFiletype format $ SomeFile (fl :: File '[] 'Other)
-
-parseFilePair :: Value -> Parser MaybePairSomeFile
-parseFilePair = withObject "FileSet" $ \obj' -> do
-    let obj = toLowerKey obj'
-    fls <- obj .:? "pair"
-    case fls of
-        Nothing -> Left <$> parseFile (Object obj')
-        Just array -> flip (withArray "FileSet") array $ \xs ->
-            if V.length xs == 2
-                then fmap Right $ (,) <$> parseFile (xs `V.unsafeIndex` 0)
-                         <*> parseFile (xs `V.unsafeIndex` 1)
-                else error "The number of files must be 2."
-
-guessFormat :: FilePath -> FileType
-guessFormat fl = case () of
-    _ | ".bam" `T.isSuffixOf` fl' -> Bam
-      | ".bai" `T.isSuffixOf` fl' -> Bai
-      | ".bed" `T.isSuffixOf` fl' -> Bed
-      | ".bed.gz" `T.isSuffixOf` fl' -> Bed
-      | ".fastq" `T.isSuffixOf` fl' -> Fastq
-      | ".fq" `T.isSuffixOf` fl' -> Fastq
-      | ".fastq.gz" `T.isSuffixOf` fl' -> Fastq
-      | ".fq.gz" `T.isSuffixOf` fl' -> Fastq
-      | ".bw" `T.isSuffixOf` fl' -> BigWig
-      | otherwise -> Other
+mkInputReader :: Experiment e
+              => FilePath  -- ^ Input file
+              -> T.Text    -- key
+              -> (CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
+              -> IO [e N [MaybePairSomeFile]]
+mkInputReader input key constructor
+    | suffix == "yml" || suffix == "yaml" = ymlReader
+    | suffix == "tsv" = tsvReader
+    | otherwise = try ymlReader >>= \case
+        Right res -> return res
+        Left (SomeException e) -> do
+            putStrLn "Parsing input file as YAML format failed because:"
+            print e
+            putStrLn "Now trying TSV format..."
+            tsvReader
   where
-    fl' = T.pack fl
+    tsvReader = do
+        tsv <- readTSV input
+        validate $ concatMap (mergeExp . map mapToCommonFields) $
+            groupBy ((==) `on` getType) $ sortBy (comparing getType) tsv
+        return $ map constructor $ mergeExp $ map mapToCommonFields $
+            filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
+      where
+        getType x = mk $ HM.lookupDefault "" "type" x
+    ymlReader = do
+        dat <- fmap (either error id . parseEither (parseList parser)) <$>
+            readYml input
+        validate $ concat $ HM.elems dat
+        case HM.lookup (mk key) dat of
+            Nothing -> return []
+            Just x -> return $ map constructor x
+      where
+        parser = withObject "E" $ \obj' ->
+            parseCommonFields (Object $ toLowerKey obj')
+    suffix = snd $ T.breakOnEnd "." $ T.pack input
 
-gzipped :: FilePath -> Bool
-gzipped fl = ".gz" `T.isSuffixOf` T.pack fl
-
-parseReplicate :: Value
-               -> Parser (S (Replicate [MaybePairSomeFile]))
-parseReplicate = withObject "Replicate" $ \obj' -> do
-    let obj = toLowerKey obj'
-    repNum <- obj .:? "rep" .!= 0
-    rep <- Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
-        obj .:? "info" .!= M.empty
-    return (repNum, rep)
-
-parseCommonFields :: Value
-                  -> Parser (CommonFields N [MaybePairSomeFile])
-parseCommonFields = withObject "CommonFields" $ \obj' -> do
-    let obj = toLowerKey obj'
-    CommonFields <$> obj .: "id" <*>
-                     obj .:? "group" <*>
-                     obj .:? "celltype" .!= "" <*>
-                     (IM.fromListWith errMsg <$>
-                        withParser (parseList parseReplicate) obj "replicates")
+validate :: [CommonFields N [MaybePairSomeFile]] -> IO ()
+validate input = unless (null redudant) $ do
+    error $ "Multiple IDs exist for: " <> show redudant
   where
-    errMsg = error "Different replicates should have unique replicate numbers"
-
-                     {-
-parseChIPSeq :: Value -> Parser (ChIPSeq [SomeFile])
-parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
-    let obj = toLowerKey obj'
-    ChIPSeq <$> parseCommonFields (Object obj') <*>
-                obj .: "target" <*>
-                obj .:? "pairedend" .!= False <*>
-                obj .:? "control"
-                -}
+    ids = map _commonEid input
+    redudant = HM.keys $ HM.filter (>1) $ HM.fromListWith (+) $ zip ids $ repeat (1 :: Int)
+{-# INLINE validate #-}
 
 readTSV :: FilePath -> IO [HM.HashMap T.Text T.Text]
 readTSV input = do
@@ -135,105 +100,7 @@ readTSV input = do
         fields = T.splitOn "\t" header
     return $ flip map content $ \l ->
         HM.fromList $ zip fields $ T.splitOn "\t" l
-
-simpleInputReader :: Experiment e
-                  => FilePath  -- ^ Input file
-                  -> T.Text    -- key
-                  -> (CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
-                  -> IO [e N [MaybePairSomeFile]]
-simpleInputReader input key constructor = try simpleReadYAML >>= \case
-    Right res -> return res
-    Left (SomeException e) -> do
-        putStrLn "Parsing input file as YAML format failed because:"
-        print e
-        putStrLn "Now trying TSV format..."
-        simpleReadTSV
-  where
-    simpleReadTSV = do
-        tsv <- readTSV input
-        return $ map constructor $ mergeExp $ map mapToCommonFields $
-            filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
-    simpleReadYAML = readFromFile input key $ withObject "E" $ \obj' ->
-        constructor <$> parseCommonFields (Object $ toLowerKey obj')
-
-
---------------------------------------------------------------------------------
--- ATACSeq
---------------------------------------------------------------------------------
-
-readATACSeq :: FilePath -> T.Text
-            -> IO [ATACSeq N [MaybePairSomeFile]]
-readATACSeq input key = readFromFile input key parseATACSeq
-
-parseATACSeq :: Value -> Parser (ATACSeq N [MaybePairSomeFile])
-parseATACSeq = withObject "ATACSeq" $ \obj' -> do
-    let obj = toLowerKey obj'
-    ATACSeq <$> parseCommonFields (Object obj)
-
-readATACSeqTSV :: FilePath -> T.Text -> IO [ATACSeq N [MaybePairSomeFile]]
-readATACSeqTSV input key = do
-    tsv <- readTSV input
-    return $ mergeExp $ map (ATACSeq . mapToCommonFields) $
-        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
-
-
---------------------------------------------------------------------------------
--- ChIPSeq
---------------------------------------------------------------------------------
-
-readChIPSeq :: FilePath -> T.Text
-            -> IO [ChIPSeq N [MaybePairSomeFile]]
-readChIPSeq input key = readFromFile input key parseChIPSeq
-
-parseChIPSeq :: Value -> Parser (ChIPSeq N [MaybePairSomeFile])
-parseChIPSeq = withObject "ChIPSeq" $ \obj' -> do
-    let obj = toLowerKey obj'
-    ChIPSeq <$> parseCommonFields (Object obj)
-
-readChIPSeqTSV :: FilePath -> T.Text -> IO [ChIPSeq N [MaybePairSomeFile]]
-readChIPSeqTSV input key = do
-    tsv <- readTSV input
-    return $ mergeExp $ map (ChIPSeq . mapToCommonFields) $
-        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
-
-
---------------------------------------------------------------------------------
--- RNASeq
---------------------------------------------------------------------------------
-
-readRNASeq :: FilePath -> T.Text
-            -> IO [RNASeq N [MaybePairSomeFile]]
-readRNASeq input key = readFromFile input key parseRNASeq
-
-readRNASeqTSV :: FilePath -> T.Text -> IO [RNASeq N [MaybePairSomeFile]]
-readRNASeqTSV input key = do
-    tsv <- readTSV input
-    return $ mergeExp $ map (RNASeq . mapToCommonFields) $
-        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
-
-parseRNASeq :: Value -> Parser (RNASeq N [MaybePairSomeFile])
-parseRNASeq = withObject "RNASeq" $ \obj' -> do
-    let obj = toLowerKey obj'
-    RNASeq <$> parseCommonFields (Object obj)
-
---------------------------------------------------------------------------------
--- HiC
---------------------------------------------------------------------------------
-readHiC :: FilePath -> T.Text
-        -> IO [HiC N [MaybePairSomeFile]]
-readHiC input key = readFromFile input key parseHiC
-
-readHiCTSV :: FilePath -> T.Text -> IO [HiC N [MaybePairSomeFile]]
-readHiCTSV input key = do
-    tsv <- readTSV input
-    return $ mergeExp $ map (HiC . mapToCommonFields) $
-        filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
-
-parseHiC :: Value -> Parser (HiC N [MaybePairSomeFile])
-parseHiC = withObject "HiC" $ \obj' -> do
-    let obj = toLowerKey obj'
-    HiC <$> parseCommonFields (Object obj)
-
+{-# INLINE readTSV #-}
 
 -- | Convert a dictionary to record
 mapToCommonFields :: HM.HashMap T.Text T.Text -> CommonFields S MaybePairSomeFile
@@ -271,25 +138,84 @@ mapToCommonFields m = CommonFields
             )
         _ -> error "too many files"
 
-readFromFile :: FilePath
-             -> T.Text   -- ^ key
-             -> (Value -> Parser a) -> IO [a]
-readFromFile input key parser = do
-    dat <- readYml input
-    case HM.lookup (mk key) dat of
-        Nothing -> return []
-        Just x -> case parseEither (parseList parser) x of
-            Left err -> error err
-            Right r  -> return r
-  where
-    readYml :: FilePath -> IO (HM.HashMap (CI T.Text) Value)
-    readYml fl = do
-        result <- decodeFile fl
-        case result of
-            Nothing  -> error "Unable to read input file. Formatting error!"
-            Just dat -> return $ HM.fromList $ map (first mk) $ HM.toList dat
-{-# INLINE readFromFile #-}
+readYml :: FilePath -> IO (HM.HashMap (CI T.Text) Value)
+readYml fl = decodeFileEither fl >>= \case
+    Left x -> error $ "Unable to read input file: " <> show x
+    Right dat -> return $ HM.fromList $ map (first mk) $ HM.toList dat
+{-# INLINE readYml #-}
 
+--------------------------------------------------------------------------------
+-- Parsers
+--------------------------------------------------------------------------------
+
+type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
+
+parseFile :: Value -> Parser SomeFile
+parseFile = withObject "File" $ \obj' -> do
+    let obj = toLowerKey obj'
+    path <- obj .: "path"
+    format <- obj .:? "format" .!= guessFormat path
+    tags <- fmap (\x -> nub $ if gzipped path then Gzip : x else x) $
+        obj .:? "tags" .!= []
+    fl <- File <$> return path <*> obj .:? "info" .!= M.empty
+    return $ addTags tags $ setFiletype format $ SomeFile (fl :: File '[] 'Other)
+{-# INLINE parseFile #-}
+
+parseFilePair :: Value -> Parser MaybePairSomeFile
+parseFilePair = withObject "FileSet" $ \obj' -> do
+    let obj = toLowerKey obj'
+    fls <- obj .:? "pair"
+    case fls of
+        Nothing -> Left <$> parseFile (Object obj')
+        Just a -> flip (withArray "FileSet") a $ \xs ->
+            if V.length xs == 2
+                then fmap Right $ (,) <$> parseFile (xs `V.unsafeIndex` 0)
+                         <*> parseFile (xs `V.unsafeIndex` 1)
+                else error "The number of files must be 2."
+{-# INLINE parseFilePair #-}
+
+guessFormat :: FilePath -> FileType
+guessFormat fl = case () of
+    _ | ".bam" `T.isSuffixOf` fl' -> Bam
+      | ".bai" `T.isSuffixOf` fl' -> Bai
+      | ".bed" `T.isSuffixOf` fl' -> Bed
+      | ".bed.gz" `T.isSuffixOf` fl' -> Bed
+      | ".fastq" `T.isSuffixOf` fl' -> Fastq
+      | ".fq" `T.isSuffixOf` fl' -> Fastq
+      | ".fastq.gz" `T.isSuffixOf` fl' -> Fastq
+      | ".fq.gz" `T.isSuffixOf` fl' -> Fastq
+      | ".bw" `T.isSuffixOf` fl' -> BigWig
+      | otherwise -> Other
+  where
+    fl' = T.pack fl
+{-# INLINE guessFormat #-}
+
+gzipped :: FilePath -> Bool
+gzipped fl = ".gz" `T.isSuffixOf` T.pack fl
+{-# INLINE gzipped #-}
+
+parseReplicate :: Value
+               -> Parser (S (Replicate [MaybePairSomeFile]))
+parseReplicate = withObject "Replicate" $ \obj' -> do
+    let obj = toLowerKey obj'
+    repNum <- obj .:? "rep" .!= 0
+    rep <- Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
+        obj .:? "info" .!= M.empty
+    return (repNum, rep)
+{-# INLINE parseReplicate #-}
+
+parseCommonFields :: Value
+                  -> Parser (CommonFields N [MaybePairSomeFile])
+parseCommonFields = withObject "CommonFields" $ \obj' -> do
+    let obj = toLowerKey obj'
+    CommonFields <$> obj .: "id" <*>
+                     obj .:? "group" <*>
+                     obj .:? "celltype" .!= "" <*>
+                     (IM.fromListWith errMsg <$>
+                        withParser (parseList parseReplicate) obj "replicates")
+  where
+    errMsg = error "Different replicates should have unique replicate numbers"
+{-# INLINE parseCommonFields #-}
 
 --------------------------------------------------------------------------------
 
