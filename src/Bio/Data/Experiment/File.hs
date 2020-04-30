@@ -42,6 +42,7 @@ $(singletons [d|
                   | BroadPeak
                   | SRA
                   | Tsv
+                  | MatrixMarket
                   | Other
         deriving (Show, Read, Eq, Ord, Generic)
     |])
@@ -60,6 +61,8 @@ $(singletons [d|
                  | TranscriptQuant
                  | Filtered
                  | ENCODE
+                 | ColumnName
+                 | RowName
                  | ChromosomeLoop
         deriving (Show, Read, Eq, Ord, Generic)
     |])
