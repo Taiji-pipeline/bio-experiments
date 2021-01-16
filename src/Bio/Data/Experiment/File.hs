@@ -64,6 +64,8 @@ $(singletons [d|
                  | ColumnName
                  | RowName
                  | ChromosomeLoop
+                 | TXG    -- ^ 10X genomics
+                 | Demultiplexed
         deriving (Show, Read, Eq, Ord, Generic)
     |])
 
