@@ -15,6 +15,8 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 module Bio.Data.Experiment.File where
 

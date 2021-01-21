@@ -11,6 +11,7 @@
 {-# LANGUAGE UndecidableInstances   #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Bio.Data.Experiment.Types
     ( S

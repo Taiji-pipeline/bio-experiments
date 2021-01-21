@@ -30,7 +30,6 @@ module Bio.Data.Experiment.Parser
 import           Control.Arrow                 (first)
 import Control.Exception
 import           Data.Aeson
-import           Data.Aeson.Internal           (JSONPathElement (..), (<?>))
 import           Data.Aeson.Types
 import           Data.CaseInsensitive          (CI, mk)
 import qualified Data.HashMap.Strict           as HM
