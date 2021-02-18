@@ -1,11 +1,11 @@
 name:                bio-experiments
-version:             0.2.1
+version:             0.2.2
 homepage:            NONE
 license:             BSD3
 license-file:        LICENSE
 author:              Kai Zhang
 maintainer:          kai@kzhang.org
-copyright:           (c) 2017-2020 Kai Zhang
+copyright:           (c) 2017-2021 Kai Zhang
 category:            Bio
 build-type:          Simple
 extra-source-files:  README.md

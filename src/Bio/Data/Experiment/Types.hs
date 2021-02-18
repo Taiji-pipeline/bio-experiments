@@ -21,6 +21,7 @@ module Bio.Data.Experiment.Types
     , groupName
     , sampleName
     , replicates
+    , batch
     , CommonFields(..)
     , defaultCommonFields
     , ATACSeq(..)
@@ -52,6 +53,7 @@ data CommonFields container file = CommonFields
     , _commonGroupName  :: !(Maybe T.Text)
     , _commonSampleName :: !T.Text
     , _commonReplicates :: container (Replicate file)
+    , _commonBatch      :: ![T.Text]
     } deriving (Generic)
 
 defaultCommonFields :: CommonFields N file
@@ -60,6 +62,7 @@ defaultCommonFields = CommonFields
     , _commonGroupName = Nothing
     , _commonSampleName = ""
     , _commonReplicates = IM.empty
+    , _commonBatch      = []
     }
 
 makeLenses ''CommonFields
@@ -82,18 +85,25 @@ commonFields f e = (\x -> setFields x e) <$> f (getFields e)
 
 eid :: Experiment e => Lens' (e c file1) T.Text
 eid = commonFields . commonEid
+{-# INLINE eid #-}
 
 groupName :: Experiment e => Lens' (e c file1) (Maybe T.Text)
 groupName = commonFields . commonGroupName
+{-# INLINE groupName #-}
 
 sampleName :: Experiment e => Lens' (e c file1) T.Text
 sampleName = commonFields . commonSampleName
+{-# INLINE sampleName #-}
 
 replicates :: Experiment e => Lens (e container1 file1)
     (e container2 file2) (container1 (Replicate file1))
     (container2 (Replicate file2))
 replicates = commonFields . commonReplicates
+{-# INLINE replicates #-}
 
+batch :: Experiment e => Lens' (e c file1) [T.Text]
+batch = commonFields . commonBatch
+{-# INLINE batch #-}
 
 -- | ATAC-seq
 newtype ATACSeq container file = ATACSeq

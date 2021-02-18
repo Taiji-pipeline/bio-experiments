@@ -43,6 +43,7 @@ import qualified Data.Text.IO                  as T
 import qualified Data.Vector                   as V
 import           Data.Yaml
 import Control.Monad (unless)
+import Data.Maybe (fromMaybe)
 
 import           Bio.Data.Experiment
 import           Bio.Data.Experiment.File
@@ -107,7 +108,8 @@ mapToCommonFields m = CommonFields
     { _commonEid = HM.lookupDefault (error "missing id!") "id" m
     , _commonGroupName = HM.lookup "group" m
     , _commonSampleName = HM.lookupDefault "" "celltype" m
-    , _commonReplicates = (repNum, rep) }
+    , _commonReplicates = (repNum, rep)
+    , _commonBatch = fromMaybe [] $ fmap (T.splitOn ",") $ HM.lookup "batch" m }
   where
     repNum = read $ T.unpack $ HM.lookupDefault "0" "rep" m
     rep = Replicate
@@ -211,7 +213,8 @@ parseCommonFields = withObject "CommonFields" $ \obj' -> do
                      obj .:? "group" <*>
                      obj .:? "celltype" .!= "" <*>
                      (IM.fromListWith errMsg <$>
-                        withParser (parseList parseReplicate) obj "replicates")
+                        withParser (parseList parseReplicate) obj "replicates") <*>
+                     obj .:? "batch" .!= []
   where
     errMsg = error "Different replicates should have unique replicate numbers"
 {-# INLINE parseCommonFields #-}

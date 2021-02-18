@@ -36,6 +36,7 @@ module Bio.Data.Experiment
     , groupName
     , sampleName
     , replicates
+    , batch
 
     , ATACSeq
     , ChIPSeq
@@ -55,7 +56,6 @@ import           Data.Function                 (on)
 import qualified Data.IntMap.Strict            as IM
 import           Data.List                     (groupBy, sortBy)
 import qualified Data.Map.Strict               as M
-import           Data.Monoid                   ((<>))
 import           Data.Ord                      (comparing)
 import           Data.Singletons.Prelude.List   (Elem, Insert)
 import           Data.Singletons.Prelude.Bool  (If)
@@ -107,6 +107,7 @@ mergeExp = map combineExp . groupBy ((==) `on` (^.eid)) .
             else error "Abort: Found experiments with same id but with different contents"
     allEqual (x:xs) = all (==x) xs
     allEqual _      = True
+{-# INLINE mergeExp #-}
 
 mergeReplicates :: [S (Replicate f)] -> N (Replicate [f])
 mergeReplicates = IM.fromListWith f . map (second (\x -> files %~ return $ x))
