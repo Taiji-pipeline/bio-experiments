@@ -36,7 +36,6 @@ module Bio.Data.Experiment
     , groupName
     , sampleName
     , replicates
-    , batch
 
     , ATACSeq
     , ChIPSeq

@@ -108,8 +108,7 @@ mapToCommonFields m = CommonFields
     { _commonEid = HM.lookupDefault (error "missing id!") "id" m
     , _commonGroupName = HM.lookup "group" m
     , _commonSampleName = HM.lookupDefault "" "celltype" m
-    , _commonReplicates = (repNum, rep)
-    , _commonBatch = fromMaybe [] $ fmap (T.splitOn ",") $ HM.lookup "batch" m }
+    , _commonReplicates = (repNum, rep) }
   where
     repNum = read $ T.unpack $ HM.lookupDefault "0" "rep" m
     rep = Replicate
@@ -213,8 +212,7 @@ parseCommonFields = withObject "CommonFields" $ \obj' -> do
                      obj .:? "group" <*>
                      obj .:? "celltype" .!= "" <*>
                      (IM.fromListWith errMsg <$>
-                        withParser (parseList parseReplicate) obj "replicates") <*>
-                     obj .:? "batch" .!= []
+                        withParser (parseList parseReplicate) obj "replicates")
   where
     errMsg = error "Different replicates should have unique replicate numbers"
 {-# INLINE parseCommonFields #-}
