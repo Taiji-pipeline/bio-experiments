@@ -38,12 +38,13 @@ import           Data.List                     (nub, groupBy, sortBy)
 import qualified Data.Map.Strict               as M
 import Data.Function (on)
 import Data.Ord (comparing)
+import qualified Data.ByteString.Char8 as B
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import qualified Data.Vector                   as V
 import           Data.Yaml
+import qualified Dhall.Yaml as D
 import Control.Monad (unless)
-import Data.Maybe (fromMaybe)
 
 import           Bio.Data.Experiment
 import           Bio.Data.Experiment.File
@@ -55,27 +56,28 @@ mkInputReader :: Experiment e
               -> (CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
               -> IO [e N [MaybePairSomeFile]]
 mkInputReader input key constructor
-    | suffix == "yml" || suffix == "yaml" = ymlReader
-    | suffix == "tsv" = tsvReader
-    | otherwise = try ymlReader >>= \case
+    | suffix == "dhall" = dhallReader input
+    | suffix == "yml" || suffix == "yaml" = ymlReader input
+    | suffix == "tsv" = tsvReader input
+    | otherwise = try (ymlReader input) >>= \case
         Right res -> return res
         Left (SomeException e) -> do
             putStrLn "Parsing input file as YAML format failed because:"
             print e
             putStrLn "Now trying TSV format..."
-            tsvReader
+            tsvReader input
   where
-    tsvReader = do
-        tsv <- readTSV input
+    tsvReader i = do
+        tsv <- readTSV i
         validate $ concatMap (mergeExp . map mapToCommonFields) $
             groupBy ((==) `on` getType) $ sortBy (comparing getType) tsv
         return $ map constructor $ mergeExp $ map mapToCommonFields $
             filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
       where
         getType x = mk $ HM.lookupDefault "" "type" x
-    ymlReader = do
+    ymlReader i = do
         dat <- fmap (either error id . parseEither (parseList parser)) <$>
-            readYml input
+            readYml i
         validate $ concat $ HM.elems dat
         case HM.lookup (mk key) dat of
             Nothing -> return []
@@ -83,6 +85,10 @@ mkInputReader input key constructor
       where
         parser = withObject "E" $ \obj' ->
             parseCommonFields (Object $ toLowerKey obj')
+    dhallReader i = do
+        let output = i <> ".yaml"
+        T.readFile i >>= D.dhallToYaml D.defaultOptions Nothing >>= B.writeFile output
+        ymlReader output
     suffix = snd $ T.breakOnEnd "." $ T.pack input
 
 validate :: [CommonFields N [MaybePairSomeFile]] -> IO ()

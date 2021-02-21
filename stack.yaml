@@ -1,4 +1,8 @@
 resolver: lts-17.4
 
+flags:
+  cryptonite:
+    use_target_attributes: false
+
 packages:
 - '.'

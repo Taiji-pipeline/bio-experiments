@@ -21,9 +21,11 @@ library
                        Bio.Data.Experiment.Parser
   build-depends:       base == 4.*
                      , binary
+                     , bytestring
                      , aeson
                      , case-insensitive
                      , containers
+                     , dhall-yaml
                      , microlens
                      , microlens-th
                      , text
