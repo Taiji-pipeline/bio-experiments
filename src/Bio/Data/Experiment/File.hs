@@ -45,6 +45,7 @@ $(singletons [d|
                   | SRA
                   | Tsv
                   | MatrixMarket
+                  | Matrix
                   | Other
         deriving (Show, Read, Eq, Ord, Generic)
     |])
