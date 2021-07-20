@@ -45,6 +45,7 @@ import qualified Data.Vector                   as V
 import           Data.Yaml
 import qualified Dhall.Yaml as D
 import Control.Monad (unless)
+import System.IO
 
 import           Bio.Data.Experiment
 import           Bio.Data.Experiment.File
@@ -100,12 +101,10 @@ validate input = unless (null redudant) $ do
 {-# INLINE validate #-}
 
 readTSV :: FilePath -> IO [HM.HashMap T.Text T.Text]
-readTSV input = do
-    c <- T.readFile input
-    let header : content = T.lines c
-        fields = T.splitOn "\t" header
-    return $ flip map content $ \l ->
-        HM.fromList $ zip fields $ T.splitOn "\t" l
+readTSV input = withFile input ReadMode $ \h -> do
+    hSetNewlineMode h universalNewlineMode
+    (header : content) <- map (T.splitOn "\t") . T.lines <$> T.hGetContents h
+    return $ map (HM.fromList . zip header) content
 {-# INLINE readTSV #-}
 
 -- | Convert a dictionary to record
