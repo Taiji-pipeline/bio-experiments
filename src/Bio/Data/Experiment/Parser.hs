@@ -28,6 +28,7 @@ module Bio.Data.Experiment.Parser
     ) where
 
 import           Control.Arrow                 (first)
+import           Lens.Micro
 import Control.Exception
 import           Data.Aeson
 import           Data.Aeson.Types
@@ -54,7 +55,7 @@ import           Bio.Data.Experiment.Types
 mkInputReader :: Experiment e
               => FilePath  -- ^ Input file
               -> T.Text    -- key
-              -> (CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
+              -> (HM.HashMap T.Text Value -> CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
               -> IO [e N [MaybePairSomeFile]]
 mkInputReader input key constructor
     | suffix == "dhall" = dhallReader input
@@ -70,19 +71,20 @@ mkInputReader input key constructor
   where
     tsvReader i = do
         tsv <- readTSV i
-        validate $ concatMap (mergeExp . map mapToCommonFields) $
+        validate $ concatMap (mergeExp . map (snd . mapToCommonFields)) $
             groupBy ((==) `on` getType) $ sortBy (comparing getType) tsv
-        return $ map constructor $ mergeExp $ map mapToCommonFields $
-            filter ((== mk key) . mk . HM.lookupDefault "" "type") tsv
+        return $ map (\x -> constructor (fst $ head x) $ head $ mergeExp $ map snd x) $
+            groupBy ((==) `on` ((^.eid) . snd)) $ sortBy (comparing ((^.eid) . snd)) $
+            map mapToCommonFields $ filter ((== mk key) . getType) tsv
       where
-        getType x = mk $ HM.lookupDefault "" "type" x
+        getType = mk . HM.lookupDefault "" "type"
     ymlReader i = do
         dat <- fmap (either error id . parseEither (parseList parser)) <$>
             readYml i
-        validate $ concat $ HM.elems dat
+        validate $ map snd $ concat $ HM.elems dat
         case HM.lookup (mk key) dat of
             Nothing -> return []
-            Just x -> return $ map constructor x
+            Just x -> return $ map (uncurry constructor) x
       where
         parser = withObject "E" $ \obj' ->
             parseCommonFields (Object $ toLowerKey obj')
@@ -108,12 +110,16 @@ readTSV input = withFile input ReadMode $ \h -> do
 {-# INLINE readTSV #-}
 
 -- | Convert a dictionary to record
-mapToCommonFields :: HM.HashMap T.Text T.Text -> CommonFields S MaybePairSomeFile
-mapToCommonFields m = CommonFields
-    { _commonEid = HM.lookupDefault (error "missing id!") "id" m
-    , _commonGroupName = HM.lookup "group" m
-    , _commonSampleName = HM.lookupDefault "" "celltype" m
-    , _commonReplicates = (repNum, rep) }
+mapToCommonFields :: HM.HashMap T.Text T.Text
+                  -> (HM.HashMap T.Text Value, CommonFields S MaybePairSomeFile)
+mapToCommonFields m = 
+    ( fmap String m
+    , CommonFields
+        { _commonEid = HM.lookupDefault (error "missing id!") "id" m
+        , _commonGroupName = HM.lookup "group" m
+        , _commonSampleName = HM.lookupDefault "" "celltype" m
+        , _commonReplicates = (repNum, rep) }
+    )
   where
     repNum = read $ T.unpack $ HM.lookupDefault "0" "rep" m
     rep = Replicate
@@ -155,16 +161,29 @@ readYml fl = decodeFileEither fl >>= \case
 
 type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
 
-parseFile :: Value -> Parser SomeFile
-parseFile = withObject "File" $ \obj' -> do
+parseCommonFields :: Value
+                  -> Parser (HM.HashMap T.Text Value, CommonFields N [MaybePairSomeFile])
+parseCommonFields = withObject "CommonFields" $ \obj' -> do
     let obj = toLowerKey obj'
-    path <- obj .: "path"
-    format <- obj .:? "format" .!= guessFormat path
-    tags <- fmap (\x -> nub $ if gzipped path then Gzip : x else x) $
-        obj .:? "tags" .!= []
-    fl <- File <$> return path <*> obj .:? "info" .!= M.empty
-    return $ addTags tags $ setFiletype format $ SomeFile (fl :: File '[] 'Other)
-{-# INLINE parseFile #-}
+    common <- CommonFields <$>
+        obj .: "id" <*>
+        obj .:? "group" <*>
+        obj .:? "celltype" .!= "" <*>
+        (IM.fromListWith errMsg <$> withParser (parseList parseReplicate) obj "replicates")
+    return (obj', common)
+  where
+    errMsg = error "Different replicates should have unique replicate numbers"
+{-# INLINE parseCommonFields #-}
+
+parseReplicate :: Value
+               -> Parser (S (Replicate [MaybePairSomeFile]))
+parseReplicate = withObject "Replicate" $ \obj' -> do
+    let obj = toLowerKey obj'
+    repNum <- obj .:? "rep" .!= 0
+    rep <- Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
+        obj .:? "info" .!= M.empty
+    return (repNum, rep)
+{-# INLINE parseReplicate #-}
 
 parseFilePair :: Value -> Parser MaybePairSomeFile
 parseFilePair = withObject "FileSet" $ \obj' -> do
@@ -178,6 +197,32 @@ parseFilePair = withObject "FileSet" $ \obj' -> do
                          <*> parseFile (xs `V.unsafeIndex` 1)
                 else error "The number of files must be 2."
 {-# INLINE parseFilePair #-}
+
+parseFile :: Value -> Parser SomeFile
+parseFile = withObject "File" $ \obj' -> do
+    let obj = toLowerKey obj'
+    path <- obj .: "path"
+    format <- obj .:? "format" .!= guessFormat path
+    tags <- fmap (\x -> nub $ if gzipped path then Gzip : x else x) $
+        obj .:? "tags" .!= []
+    fl <- File <$> return path <*> obj .:? "info" .!= M.empty
+    return $ addTags tags $ setFiletype format $ SomeFile (fl :: File '[] 'Other)
+{-# INLINE parseFile #-}
+
+--------------------------------------------------------------------------------
+-- Utilities
+--------------------------------------------------------------------------------
+
+withParser :: (Value -> Parser a) -> Object -> T.Text -> Parser a
+withParser p obj key = case HM.lookup key obj of
+    Nothing -> fail $ "key " ++ show key ++ " not present"
+    Just v  -> p v <?> Key key
+{-# INLINE withParser #-}
+
+parseList :: (Value -> Parser a) -> Value -> Parser [a]
+parseList p (Array a) = mapM p $ V.toList a
+parseList _ _         = error "Not a list"
+{-# INLINE parseList #-}
 
 guessFormat :: FilePath -> FileType
 guessFormat fl = case () of
@@ -199,42 +244,6 @@ gzipped :: FilePath -> Bool
 gzipped fl = ".gz" `T.isSuffixOf` T.pack fl
 {-# INLINE gzipped #-}
 
-parseReplicate :: Value
-               -> Parser (S (Replicate [MaybePairSomeFile]))
-parseReplicate = withObject "Replicate" $ \obj' -> do
-    let obj = toLowerKey obj'
-    repNum <- obj .:? "rep" .!= 0
-    rep <- Replicate <$> withParser (parseList parseFilePair) obj "files" <*>
-        obj .:? "info" .!= M.empty
-    return (repNum, rep)
-{-# INLINE parseReplicate #-}
-
-parseCommonFields :: Value
-                  -> Parser (CommonFields N [MaybePairSomeFile])
-parseCommonFields = withObject "CommonFields" $ \obj' -> do
-    let obj = toLowerKey obj'
-    CommonFields <$> obj .: "id" <*>
-                     obj .:? "group" <*>
-                     obj .:? "celltype" .!= "" <*>
-                     (IM.fromListWith errMsg <$>
-                        withParser (parseList parseReplicate) obj "replicates")
-  where
-    errMsg = error "Different replicates should have unique replicate numbers"
-{-# INLINE parseCommonFields #-}
-
---------------------------------------------------------------------------------
-
 toLowerKey :: HM.HashMap T.Text a -> HM.HashMap T.Text a
 toLowerKey = HM.fromList . map (first T.toLower) . HM.toList
 {-# INLINE toLowerKey #-}
-
-withParser :: (Value -> Parser a) -> Object -> T.Text -> Parser a
-withParser p obj key = case HM.lookup key obj of
-    Nothing -> fail $ "key " ++ show key ++ " not present"
-    Just v  -> p v <?> Key key
-{-# INLINE withParser #-}
-
-parseList :: (Value -> Parser a) -> Value -> Parser [a]
-parseList p (Array a) = mapM p $ V.toList a
-parseList _ _         = error "Not a list"
-{-# INLINE parseList #-}
