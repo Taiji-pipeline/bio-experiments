@@ -16,7 +16,7 @@
 module Bio.Data.Experiment.Types
     ( S
     , N
-    , Experiment
+    , Experiment(..)
     , eid
     , groupName
     , sampleName
