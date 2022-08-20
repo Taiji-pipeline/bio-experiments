@@ -56,8 +56,8 @@ import qualified Data.IntMap.Strict            as IM
 import           Data.List                     (groupBy, sortBy)
 import qualified Data.Map.Strict               as M
 import           Data.Ord                      (comparing)
-import           Data.Singletons.Prelude.List   (Elem, Insert)
-import           Data.Singletons.Prelude.Bool  (If)
+import           Prelude.Singletons  (If)
+import Data.List.Singletons (Insert, Elem)
 import           GHC.Exts                      (Constraint)
 
 import           Bio.Data.Experiment.File

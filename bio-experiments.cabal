@@ -29,7 +29,9 @@ library
                      , microlens
                      , microlens-th
                      , text
-                     , singletons >= 2.5
+                     , singletons >= 3.0
+                     , singletons-th
+                     , singletons-base
                      , unordered-containers
                      , yaml
                      , vector

@@ -33,9 +33,11 @@ import Control.Exception
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.CaseInsensitive          (CI, mk)
+import qualified Data.Aeson.KeyMap as K
 import qualified Data.HashMap.Strict           as HM
 import qualified Data.IntMap.Strict            as IM
 import           Data.List                     (nub, groupBy, sortBy)
+import Data.String (fromString)
 import qualified Data.Map.Strict               as M
 import Data.Function (on)
 import Data.Ord (comparing)
@@ -55,7 +57,7 @@ import           Bio.Data.Experiment.Types
 mkInputReader :: Experiment e
               => FilePath  -- ^ Input file
               -> T.Text    -- key
-              -> (HM.HashMap T.Text Value -> CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
+              -> (K.KeyMap Value -> CommonFields N [MaybePairSomeFile] -> e N [MaybePairSomeFile])
               -> IO [e N [MaybePairSomeFile]]
 mkInputReader input key constructor
     | suffix == "dhall" = dhallReader input
@@ -111,9 +113,9 @@ readTSV input = withFile input ReadMode $ \h -> do
 
 -- | Convert a dictionary to record
 mapToCommonFields :: HM.HashMap T.Text T.Text
-                  -> (HM.HashMap T.Text Value, CommonFields S MaybePairSomeFile)
+                  -> (K.KeyMap Value, CommonFields S MaybePairSomeFile)
 mapToCommonFields m = 
-    ( fmap String m
+    ( K.fromHashMapText $ fmap String m
     , CommonFields
         { _commonEid = HM.lookupDefault (error "missing id!") "id" m
         , _commonGroupName = HM.lookup "group" m
@@ -162,7 +164,7 @@ readYml fl = decodeFileEither fl >>= \case
 type MaybePairSomeFile = Either SomeFile (SomeFile, SomeFile)
 
 parseCommonFields :: Value
-                  -> Parser (HM.HashMap T.Text Value, CommonFields N [MaybePairSomeFile])
+                  -> Parser (K.KeyMap Value, CommonFields N [MaybePairSomeFile])
 parseCommonFields = withObject "CommonFields" $ \obj' -> do
     let obj = toLowerKey obj'
     common <- CommonFields <$>
@@ -214,9 +216,9 @@ parseFile = withObject "File" $ \obj' -> do
 --------------------------------------------------------------------------------
 
 withParser :: (Value -> Parser a) -> Object -> T.Text -> Parser a
-withParser p obj key = case HM.lookup key obj of
+withParser p obj key = case K.lookup (fromString $ T.unpack key) obj of
     Nothing -> fail $ "key " ++ show key ++ " not present"
-    Just v  -> p v <?> Key key
+    Just v  -> p v <?> Key (fromString $ T.unpack key)
 {-# INLINE withParser #-}
 
 parseList :: (Value -> Parser a) -> Value -> Parser [a]
@@ -244,6 +246,6 @@ gzipped :: FilePath -> Bool
 gzipped fl = ".gz" `T.isSuffixOf` T.pack fl
 {-# INLINE gzipped #-}
 
-toLowerKey :: HM.HashMap T.Text a -> HM.HashMap T.Text a
-toLowerKey = HM.fromList . map (first T.toLower) . HM.toList
+toLowerKey :: K.KeyMap v -> K.KeyMap v
+toLowerKey = K.fromHashMapText . HM.fromList . map (first T.toLower) . HM.toList . K.toHashMapText
 {-# INLINE toLowerKey #-}

@@ -26,8 +26,12 @@ import           Data.Coerce             (coerce)
 import           Data.List               (foldl')
 import qualified Data.Map.Strict         as M
 import           Data.Binary (Binary(..))
-import           Data.Singletons.Prelude
+
 import           Data.Singletons.TH
+import Data.Ord.Singletons
+import Data.String.Singletons
+import           Prelude.Singletons
+
 import qualified Data.Text               as T
 import           GHC.Generics            (Generic)
 
